@@ -9,21 +9,18 @@ export const getProducts = async (req: Request, res: Response) => {
     const limit = parseInt(req.query.limit as string) || 10;
     const page = parseInt(req.query.page as string) || 1;
 
-    const userId = req.user?._id;
-    if (!userId || !organizationId)
+    if ( !organizationId)
       return res
         .status(400)
         .json({ message: "Missing user or organization ID" });
 
     const products = await ProductModel.find({
-      userId,
       organizationId,
     })
       .limit(limit)
       .skip((page - 1) * limit)
       .sort({ createdAt: -1 });
     const totalProducts = await ProductModel.countDocuments({
-      userId,
       organizationId,
     });
     const totalPages = Math.ceil(totalProducts / limit);
