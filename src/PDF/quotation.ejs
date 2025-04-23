@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Cotización CO<%= quotation.quotationNumber %></title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <style>
+      body {
+        position: relative;
+        font-size: 12px;
+        color: #1F2937;
+        font-family: 'Inter', sans-serif;
+        background-image: url('https://fusioncrmbucket.s3.us-east-1.amazonaws.com/bg.jpg');
+        background-size: contain ;
+        background-position: center;
+        background-repeat: no-repeat;
+      }
+      @page {
+        margin: 0.5in;
+      }
+    </style>
+  </head>
+  <body class="text-gray-800">
+    <!-- Header -->
+    <div class="flex justify-between items-center border-b pb-4 mb-6">
+      <img src="<%= logoUrl %>" class="w-36 object-contain" />
+      <div class="text-right">
+        <h1 class="text-2xl font-extrabold text-blue-800 tracking-wide">Cotización CO<%= quotation.quotationNumber %></h1>
+        <p class="text-sm text-gray-600">Fecha: <%= new Date(quotation.creationDate).toLocaleDateString() %></p>
+        <p class="text-sm text-gray-600">Vence: <%= new Date(quotation.expirationDate).toLocaleDateString() %></p>
+      </div>
+    </div>
+
+    <!-- Cliente -->
+    <div class="border-l-4 border-blue-800 bg-white/90 shadow-md px-4 py-3 rounded mb-6">
+      <h2 class="text-sm font-semibold text-blue-800 mb-1">Información del Cliente</h2>
+      <p><span class="font-medium text-gray-700">Nombre:</span> <%= quotation.contactId?.firstName || 'N/A' %> <%= quotation.contactId?.lastName || '' %></p>
+      <p><span class="font-medium text-gray-700">Empresa:</span> <%= quotation.contactId?.companyName || 'N/A' %></p>
+      <p><span class="font-medium text-gray-700">NIT:</span> <%= quotation.contactId?.idNumber || 'N/A' %></p>
+      <p><span class="font-medium text-gray-700">Teléfono:</span> <%= quotation.contactId?.phone || quotation.contactId?.mobile || 'N/A' %></p>
+      <p><span class="font-medium text-gray-700">Email:</span> <%= quotation.contactId?.email || 'N/A' %></p>
+    </div>
+
+    <!-- Tabla de productos -->
+    <table class="w-full text-sm border border-gray-300 rounded-lg overflow-hidden shadow-sm">
+      <thead class="bg-red-700 text-white">
+        <tr>
+          <th class="text-left px-3 py-2">Producto</th>
+          <th class="text-center px-2 py-2">Cantidad</th>
+          <th class="text-right px-2 py-2">Precio</th>
+          <th class="text-right px-2 py-2">IVA</th>
+          <th class="text-right px-3 py-2">Total</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-gray-200">
+        <% quotation.items.forEach(item => { %>
+          <tr>
+            <% console.log('Image URL:', item.imageUrl); %>
+            <td class="px-3 py-2">
+              <div class="flex gap-3 items-start">
+                <img
+                  src="<%= item.imageUrl || 'https://via.placeholder.com/60?text=Sin+Imagen' %>"
+                  class="w-16 h-16 object-contain border rounded"
+                />
+                <div>
+                  <div class="font-semibold text-gray-800 text-sm"><%= item.name %></div>
+                  <div class="text-gray-500 text-xs italic"><%= item.description %></div>
+                </div>
+              </div>
+            </td>
+            <td class="text-center px-2 py-2"><%= item.quantity %></td>
+            <td class="text-right px-2 py-2">$<%= item.unitPrice.toLocaleString("es-CO") %></td>
+            <td class="text-right px-2 py-2"><%= item.taxes %>%</td>
+            <td class="text-right px-3 py-2 font-medium">$<%= item.total.toLocaleString("es-CO") %></td>
+          </tr>
+        <% }) %>
+      </tbody>
+    </table>
+
+    <!-- Totales -->
+    <div class="text-right mt-8 w-full">
+      <div class="space-y-1 text-sm">
+        <p class="text-gray-600">Subtotal: <span class="font-medium">$<%= quotation.subtotal.toLocaleString("es-CO") %></span></p>
+        <p class="text-gray-600">IVA: <span class="font-medium">$<%= quotation.taxes.toLocaleString("es-CO") %></span></p>
+        <p class="text-xl font-bold text-blue-800 mt-2">Total: $<%= quotation.total.toLocaleString("es-CO") %></p>
+      </div>
+    </div>
+
+    <!-- Condiciones -->
+    <div class="mt-10 text-sm">
+      <h3 class="text-gray-800 font-semibold mb-1 pb-1">Condiciones Comerciales</h3>
+      <p class="text-gray-600">Forma de pago: <span class="text-gray-800 font-medium"><%= quotation.paymentTerms || 'A convenir' %></span></p>
+      <p class="text-gray-600">Tiempo de entrega: <span class="text-gray-800 font-medium"><%= quotation.shippingTerms || 'A convenir' %></span></p>
+      <% console.log('Desde la plantilla:', quotation); %>
+      <p class="mt-3 text-gray-600">Observaciones: <span class="text-gray-800 italic"><%= quotation.observaciones || 'Sin observaciones' %></span></p>
+    </div>
+    
+
+    <!-- Footer -->
+    <footer class="text-center text-xs text-gray-400 mt-16 pt-4 border-t">
+      <%= footerText %>
+    </footer>
+  </body>
+</html>
