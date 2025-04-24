@@ -148,5 +148,53 @@ async function runFullTest() {
   }
 }
 
+// Función para crear una automatización de emails masivos de ejemplo
+async function createMassEmailAutomation() {
+  try {
+    // Crear una automatización de ejemplo de envío masivo
+    const automation = new AutomationModel({
+      name: "Automatización de emails masivos",
+      description: "Envía emails a todos los contactos de una lista",
+      isActive: true,
+      organizationId: new mongoose.Types.ObjectId(),
+      createdBy: new mongoose.Types.ObjectId(),
+      nodes: [
+        {
+          id: "1",
+          type: "trigger",
+          module: "manual", // Trigger manual, se ejecutará manualmente
+          event: "execute",
+          next: ["2"],
+        },
+        {
+          id: "2", 
+          type: "send_mass_email",
+          listId: "ID_DE_TU_LISTA", // Aquí deberías colocar un ID real de una lista
+          subject: "Información importante para nuestros clientes",
+          emailBody: "<p>Hola {{contact.firstName}},</p><p>Te enviamos esta información importante...</p><p>Saludos,<br>El equipo</p>",
+          next: ["3"]
+        },
+        {
+          id: "3",
+          type: "transform",
+          transformations: [
+            {
+              outputField: "emailReport",
+              expression: "Emails enviados: {{massEmailResult.successCount}} de {{massEmailResult.totalContacts}}"
+            }
+          ]
+        }
+      ],
+    });
+
+    await automation.save();
+    console.log("Automatización de emails masivos creada:", automation._id);
+    return automation;
+  } catch (error) {
+    console.error("Error al crear automatización de emails masivos:", error);
+    throw error;
+  }
+}
+
 // Ejecutar las pruebas
 runFullTest();

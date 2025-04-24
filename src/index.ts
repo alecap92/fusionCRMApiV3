@@ -24,7 +24,17 @@ interface ServerInstance {
 // Inicialización de servicios
 const initializeServices = async (): Promise<void> => {
   await connect();
+  
+  // Inicializar el cliente IMAP para emails
   listenForNewEmails();
+  
+  // Inicializar el servicio de colas para automatizaciones
+  try {
+    const { queueService } = await import('./services/queue/queueService');
+    console.log('✅ Servicio de colas inicializado correctamente');
+  } catch (error) {
+    console.error('❌ Error al inicializar el servicio de colas:', error);
+  }
 };
 
 // Configuración de middleware
@@ -188,13 +198,49 @@ const startServer = async (): Promise<ServerInstance> => {
 
 // Iniciar la aplicación
 if (require.main === module) {
-  startServer().catch((error: unknown) => {
-    console.error(
-      "Error fatal al iniciar la aplicación:",
-      error instanceof Error ? error.message : "Error desconocido"
-    );
-    process.exit(1);
-  });
+  let serverInstance: ServerInstance | null = null;
+  
+  // Capturar señales de terminación para cerrar limpiamente
+  const handleShutdown = async (signal: string) => {
+    console.log(`Recibida señal ${signal}, cerrando aplicación...`);
+    
+    // Cerrar el servicio de colas si está inicializado
+    try {
+      const { queueService } = await import('./services/queue/queueService');
+      await queueService.close();
+      console.log('✅ Servicio de colas cerrado correctamente');
+    } catch (error) {
+      console.error('❌ Error al cerrar el servicio de colas:', error);
+    }
+    
+    // Cerrar el servidor HTTP si está inicializado
+    if (serverInstance && serverInstance.server) {
+      console.log('Cerrando conexiones HTTP...');
+      serverInstance.server.close(() => {
+        console.log('Servidor HTTP cerrado correctamente');
+        process.exit(0);
+      });
+    } else {
+      process.exit(0);
+    }
+  };
+  
+  // Registrar manejadores para señales de terminación
+  process.on('SIGINT', () => handleShutdown('SIGINT'));
+  process.on('SIGTERM', () => handleShutdown('SIGTERM'));
+  
+  // Iniciar el servidor
+  startServer()
+    .then((instance) => {
+      serverInstance = instance;
+    })
+    .catch((error: unknown) => {
+      console.error(
+        "Error fatal al iniciar la aplicación:",
+        error instanceof Error ? error.message : "Error desconocido"
+      );
+      process.exit(1);
+    });
 }
 
 export default startServer;

@@ -103,7 +103,7 @@ const nodeTypes = [
           email: { type: "string", label: "Email", required: true },
           phone: { type: "string", label: "Phone Number" },
           mobile: { type: "string", label: "Mobile Number" },
-          company: { type: "string", label: "Company Name" },
+          companyName: { type: "string", label: "Company Name" },
           position: { type: "string", label: "Job Position" },
           address: { type: "string", label: "Address" },
           city: { type: "string", label: "City" },

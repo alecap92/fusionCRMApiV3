@@ -178,6 +178,15 @@ const validateAutomation = (
           };
         }
         break;
+
+      case "send_mass_email":
+        if (!node.listId || !node.subject || !node.emailBody) {
+          return {
+            isValid: false,
+            message: `El nodo send_mass_email ${node.id} debe tener listId, asunto y cuerpo del email definidos`,
+          };
+        }
+        break;
     }
   }
 
@@ -745,6 +754,38 @@ export const getNodeTypes = async (req: Request, res: Response) => {
             required: true,
             label: "Transformaciones",
           },
+        ],
+      },
+      {
+        type: "send_mass_email",
+        name: "Enviar Emails Masivos",
+        description: "Envía correos electrónicos a todos los contactos de una lista",
+        category: "actions",
+        configFields: [
+          { 
+            name: "listId", 
+            type: "select", 
+            required: true, 
+            label: "Lista de Contactos",
+            endpoint: "/api/v1/lists", 
+            valueField: "_id",
+            labelField: "name"
+          },
+          { name: "subject", type: "text", required: true, label: "Asunto" },
+          {
+            name: "emailBody",
+            type: "richtext",
+            required: true,
+            label: "Contenido",
+            helpText: "Puedes usar variables como {{contact.firstName}}, {{contact.email}}, etc."
+          },
+          {
+            name: "from",
+            type: "text",
+            required: false,
+            label: "Remitente",
+            helpText: "Email del remitente. Si no se especifica, se usará el predeterminado."
+          }
         ],
       },
     ];

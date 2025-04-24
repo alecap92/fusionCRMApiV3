@@ -2,6 +2,7 @@
 import { Request, Response } from "express";
 import mongoose from "mongoose";
 import crypto from "crypto";
+import { nanoid } from 'nanoid';
 import WebhookEndpointModel from "../../models/WebhookEndpointModel";
 
 /**
@@ -17,8 +18,19 @@ export const getWebhookEndpoints = async (req: Request, res: Response) => {
   }
 
   try {
+    // Obtener todos los endpoints y añadir la URL completa
     const endpoints = await WebhookEndpointModel.find({ organizationId });
-    return res.status(200).json(endpoints);
+    
+    // Añadir la URL completa a cada endpoint
+    const endpointsWithUrl = endpoints.map(endpoint => {
+      const webhookUrl = `${process.env.API_BASE_URL || 'http://localhost:3001'}/api/v1/webhooks/id/${endpoint.uniqueId}`;
+      return {
+        ...endpoint.toObject(),
+        fullUrl: webhookUrl
+      };
+    });
+    
+    return res.status(200).json(endpointsWithUrl);
   } catch (error) {
     return res.status(500).json({
       message: "Error al obtener endpoints de webhook",
@@ -31,8 +43,7 @@ export const getWebhookEndpoints = async (req: Request, res: Response) => {
  * Crea un nuevo endpoint de webhook
  */
 export const createWebhookEndpoint = async (req: Request, res: Response) => {
-  const { name, description, module, event, isActive = true } = req.body;
-  const organizationId = req.user?.organizationId;
+  const { name, description, module, event, isActive = true, organizationId, createdBy } = req.body;
 
   if (!organizationId) {
     return res
@@ -49,6 +60,9 @@ export const createWebhookEndpoint = async (req: Request, res: Response) => {
   try {
     // Generar token secreto para el webhook
     const secret = crypto.randomBytes(32).toString("hex");
+    
+    // Generar un ID único para el webhook (10 caracteres)
+    const uniqueId = nanoid(10);
 
     const endpoint = new WebhookEndpointModel({
       name,
@@ -57,13 +71,21 @@ export const createWebhookEndpoint = async (req: Request, res: Response) => {
       event,
       isActive,
       organizationId,
-      createdBy: req.user?._id,
+      createdBy,
       secret,
+      uniqueId,
     });
 
     await endpoint.save();
 
-    return res.status(201).json(endpoint);
+    // Construir la URL completa del webhook
+    const webhookUrl = `${process.env.API_BASE_URL || 'http://localhost:3001'}/api/v1/webhooks/id/${uniqueId}`;
+
+    // Devolver el endpoint con la URL completa
+    return res.status(201).json({
+      ...endpoint.toObject(),
+      fullUrl: webhookUrl
+    });
   } catch (error) {
     return res.status(500).json({
       message: "Error al crear endpoint de webhook",
@@ -77,7 +99,7 @@ export const createWebhookEndpoint = async (req: Request, res: Response) => {
  */
 export const updateWebhookEndpoint = async (req: Request, res: Response) => {
   const { id } = req.params;
-  const { name, description, module, event, isActive } = req.body;
+  const { name, description, module, event, isActive, uniqueId } = req.body;
   const organizationId = req.user?.organizationId;
 
   if (!organizationId || !mongoose.Types.ObjectId.isValid(id)) {
@@ -87,15 +109,18 @@ export const updateWebhookEndpoint = async (req: Request, res: Response) => {
   }
 
   try {
+    // Crear un objeto con los campos a actualizar
+    const updateFields: any = {};
+    if (name) updateFields.name = name;
+    if (description !== undefined) updateFields.description = description;
+    if (module) updateFields.module = module;
+    if (event) updateFields.event = event;
+    if (isActive !== undefined) updateFields.isActive = isActive;
+    if (uniqueId) updateFields.uniqueId = uniqueId; // Actualizar uniqueId si se proporciona
+
     const endpoint = await WebhookEndpointModel.findOneAndUpdate(
       { _id: id, organizationId },
-      {
-        ...(name && { name }),
-        ...(description !== undefined && { description }),
-        ...(module && { module }),
-        ...(event && { event }),
-        ...(isActive !== undefined && { isActive }),
-      },
+      updateFields,
       { new: true }
     );
 
@@ -105,7 +130,14 @@ export const updateWebhookEndpoint = async (req: Request, res: Response) => {
         .json({ message: "Endpoint de webhook no encontrado" });
     }
 
-    return res.status(200).json(endpoint);
+    // Construir la URL completa del webhook
+    const webhookUrl = `${process.env.API_BASE_URL || 'http://localhost:3001'}/api/v1/webhooks/id/${endpoint.uniqueId}`;
+
+    // Devolver el endpoint con la URL completa
+    return res.status(200).json({
+      ...endpoint.toObject(),
+      fullUrl: webhookUrl
+    });
   } catch (error) {
     return res.status(500).json({
       message: "Error al actualizar endpoint de webhook",
@@ -143,7 +175,14 @@ export const regenerateWebhookSecret = async (req: Request, res: Response) => {
         .json({ message: "Endpoint de webhook no encontrado" });
     }
 
-    return res.status(200).json(endpoint);
+    // Construir la URL completa del webhook
+    const webhookUrl = `${process.env.API_BASE_URL || 'http://localhost:3001'}/api/v1/webhooks/id/${endpoint.uniqueId}`;
+
+    // Devolver el endpoint con la URL completa
+    return res.status(200).json({
+      ...endpoint.toObject(),
+      fullUrl: webhookUrl
+    });
   } catch (error) {
     return res.status(500).json({
       message: "Error al regenerar secreto del webhook",

@@ -137,6 +137,6 @@ export const sendEmailWithBrevo = async (params: EmailParams): Promise<boolean> 
     return true;
   } catch (error) {
     console.error('Error enviando email con Brevo:', error);
-    throw new Error(`Error al enviar email: ${error instanceof Error ? error.message : String(error)}`);
+    throw new Error(`Error al enviar email Brevo: ${error instanceof Error ? error.message : String(error)}`);
   }
 }; 

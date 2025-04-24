@@ -8,6 +8,7 @@ export interface IWebhookEndpoint extends Document {
   module: string;
   event: string;
   url?: string;
+  uniqueId: string;
   secret: string;
   isActive: boolean;
   organizationId: Types.ObjectId;
@@ -42,6 +43,12 @@ const webhookEndpointSchema = new Schema<IWebhookEndpoint>(
       type: String,
       trim: true,
     },
+    uniqueId: {
+      type: String,
+      required: true,
+      unique: true,
+      trim: true,
+    },
     secret: {
       type: String,
       required: true,
@@ -68,6 +75,7 @@ const webhookEndpointSchema = new Schema<IWebhookEndpoint>(
 webhookEndpointSchema.index({ organizationId: 1 });
 webhookEndpointSchema.index({ module: 1, event: 1 });
 webhookEndpointSchema.index({ isActive: 1 });
+webhookEndpointSchema.index({ uniqueId: 1 }, { unique: true });
 
 const WebhookEndpointModel = model<IWebhookEndpoint>(
   "WebhookEndpoint",

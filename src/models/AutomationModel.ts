@@ -8,7 +8,9 @@ export type NodeType =
   | "send_email"
   | "send_whatsapp"
   | "delay"
-  | "transform";
+  | "transform"
+  | "send_mass_email"
+  | "contacts";
 
 // Tipos de operadores para condiciones
 export type ConditionOperator =
@@ -66,6 +68,7 @@ export interface SendEmailNode extends BaseNode {
   subject: string;
   emailBody: string;
   next?: string[];
+  from?: string;
 }
 
 // Nodo Send WhatsApp
@@ -93,6 +96,25 @@ export interface TransformNode extends BaseNode {
   next: string[];
 }
 
+// Nodo Send Mass Email
+export interface SendMassEmailNode extends BaseNode {
+  type: "send_mass_email";
+  listId: string;         // ID de la lista de contactos
+  subject: string;        // Asunto del correo
+  emailBody: string;      // Cuerpo del correo (puede contener variables)
+  from?: string;          // Remitente (opcional, si no se proporciona se usará el predeterminado)
+  next?: string[];        // Referencias a los siguientes nodos
+}
+
+// Nodo Contacts
+export interface ContactsNode extends BaseNode {
+  type: "contacts";
+  action: "create" | "update" | "delete" | "find";
+  contactData?: Record<string, any>;  // Datos del contacto para crear o actualizar
+  contactId?: string;                // ID del contacto para actualizar o eliminar
+  next?: string[];                   // Referencias a los siguientes nodos
+}
+
 // Unión de todos los tipos de nodos
 export type AutomationNode =
   | TriggerNode
@@ -101,7 +123,9 @@ export type AutomationNode =
   | SendEmailNode
   | SendWhatsAppNode
   | DelayNode
-  | TransformNode;
+  | TransformNode
+  | SendMassEmailNode
+  | ContactsNode;
 
 // Interfaz para el documento de Mongoose
 export interface IAutomationDocument extends Document {
