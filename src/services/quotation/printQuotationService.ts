@@ -89,7 +89,8 @@ export const generateQuotationPdf = async (
 
     // Iniciar puppeteer
     const browser = await puppeteer.launch({ 
-      headless: pdfOptions.headless
+      headless: pdfOptions.headless,
+      args: ['--no-sandbox', '--disable-setuid-sandbox']
     });
     const page = await browser.newPage();
 

@@ -72,7 +72,8 @@ const generateQuotationPdf = (quotationNumber, organizationId, options) => __awa
         });
         // Iniciar puppeteer
         const browser = yield puppeteer_1.default.launch({
-            headless: pdfOptions.headless
+            headless: pdfOptions.headless,
+            args: ['--no-sandbox', '--disable-setuid-sandbox']
         });
         const page = yield browser.newPage();
         // Configurar y generar el PDF
