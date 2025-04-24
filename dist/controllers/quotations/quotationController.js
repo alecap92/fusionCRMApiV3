@@ -213,6 +213,7 @@ const printQuotation = (req, res) => __awaiter(void 0, void 0, void 0, function*
     try {
         const { id } = req.params;
         const organizationId = (_a = req.user) === null || _a === void 0 ? void 0 : _a.organizationId;
+        console.log(id, organizationId);
         if (!organizationId) {
             return res.status(400).json({ message: "ID de organización no proporcionado" });
         }

@@ -63,7 +63,7 @@ const generateQuotationPdf = (quotationNumber, organizationId, options) => __awa
         // Asignar los datos de contacto a la cotización
         const quotationWithContactData = Object.assign(Object.assign({}, quotation), { contactId: contactData });
         // Ruta a la plantilla EJS
-        const templatePath = path_1.default.join(__dirname, "../../PDF/quotation.ejs");
+        const templatePath = path_1.default.resolve(process.cwd(), process.env.NODE_ENV === 'production' ? 'dist/PDF/quotation.ejs' : 'src/PDF/quotation.ejs');
         // Renderizar la plantilla HTML
         const html = yield ejs_1.default.renderFile(templatePath, {
             quotation: quotationWithContactData,

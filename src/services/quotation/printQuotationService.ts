@@ -78,7 +78,7 @@ export const generateQuotationPdf = async (
     };
 
     // Ruta a la plantilla EJS
-    const templatePath = path.join(__dirname, "../../PDF/quotation.ejs");
+    const templatePath = path.resolve(process.cwd(), process.env.NODE_ENV === 'production' ? 'dist/PDF/quotation.ejs' : 'src/PDF/quotation.ejs');
 
     // Renderizar la plantilla HTML
     const html = await ejs.renderFile(templatePath, {

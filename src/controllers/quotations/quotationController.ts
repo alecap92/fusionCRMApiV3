@@ -222,7 +222,7 @@ export const printQuotation = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const organizationId = req.user?.organizationId;
-
+    console.log(id, organizationId);
     if (!organizationId) {
       return res.status(400).json({ message: "ID de organización no proporcionado" });
     }
