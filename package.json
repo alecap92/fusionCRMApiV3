@@ -6,7 +6,7 @@
   "scripts": {
     "start": "node dist/index.js",
     "dev": "nodemon src/index.ts",
-    "build": "tsc && mkdir -p dist/PDF && cp -r src/PDF/quotation.ejs src/PDF/fonts dist/PDF/",
+    "build": "tsc && mkdir -p dist/PDF && cp -r src/PDF/quotation.ejs dist/PDF/ && [ -d src/PDF/fonts ] && cp -r src/PDF/fonts dist/PDF/ || echo 'No fonts directory found'",
     "fmt": "prettier --write \"./src/**/*.{ts,tsx,js,json}\"",
     "test:automation": "ts-node src/tests/automation-test.ts",
     "test:controller": "ts-node src/tests/controller-test.ts",
