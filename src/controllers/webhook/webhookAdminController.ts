@@ -2,8 +2,14 @@
 import { Request, Response } from "express";
 import mongoose from "mongoose";
 import crypto from "crypto";
-import { nanoid } from 'nanoid';
+// import { nanoid } from 'nanoid'; // Reemplazando esta importación
 import WebhookEndpointModel from "../../models/WebhookEndpointModel";
+
+// Función auxiliar para nanoid como importación dinámica
+const generateNanoId = async (size = 10) => {
+  const { nanoid } = await import('nanoid');
+  return nanoid(size);
+};
 
 /**
  * Obtiene todos los endpoints de webhook registrados para una organización
@@ -61,8 +67,8 @@ export const createWebhookEndpoint = async (req: Request, res: Response) => {
     // Generar token secreto para el webhook
     const secret = crypto.randomBytes(32).toString("hex");
     
-    // Generar un ID único para el webhook (10 caracteres)
-    const uniqueId = nanoid(10);
+    // Generar un ID único para el webhook (10 caracteres) con importación dinámica
+    const uniqueId = await generateNanoId(10);
 
     const endpoint = new WebhookEndpointModel({
       name,

@@ -1,0 +1,11 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const campanasController_1 = require("../controllers/campanas/campanasController");
+const router = (0, express_1.Router)();
+router.get("/", campanasController_1.getCampanas);
+router.get("/:id", campanasController_1.getCampana);
+router.post("/", campanasController_1.createCampana);
+router.put("/:id", campanasController_1.updateCampana);
+router.delete("/:id", campanasController_1.deleteCampana);
+exports.default = router;

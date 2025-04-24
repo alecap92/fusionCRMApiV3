@@ -1,0 +1,15 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const contactsController_1 = require("../controllers/contacts/contactsController");
+const advancedFilter_1 = require("../controllers/contacts/advancedFilter");
+const router = (0, express_1.Router)();
+router.get("/", contactsController_1.getContacts);
+router.get("/search", contactsController_1.searchContact);
+router.post("/filter", contactsController_1.filterContacts);
+router.post("/", contactsController_1.createContact);
+router.post("/advanced-filter", advancedFilter_1.advancedFilterContacts);
+router.delete("/", contactsController_1.deleteContact);
+router.put("/:id", contactsController_1.updateContact);
+router.get("/:id", contactsController_1.getContact);
+exports.default = router;

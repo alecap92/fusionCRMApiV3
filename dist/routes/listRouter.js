@@ -1,0 +1,13 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const listController_1 = require("../controllers/lists/listController");
+const router = (0, express_1.Router)();
+router.post("/static", listController_1.createStaticList);
+router.post("/dynamic", listController_1.createDynamicList);
+router.get("/dynamic/:id", listController_1.getDynamicListContacts);
+router.get("/export/:id", listController_1.exportList);
+router.get("/", listController_1.getAllLists);
+router.put("/:id", listController_1.updateList);
+router.delete("/:id", listController_1.deleteList);
+exports.default = router;

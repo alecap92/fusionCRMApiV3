@@ -1,0 +1,8 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const pipelinesController_1 = require("../controllers/pipelines/pipelinesController");
+const router = (0, express_1.Router)();
+router.get("/", pipelinesController_1.getPipelines);
+router.post("/", pipelinesController_1.createPipeline);
+exports.default = router;
