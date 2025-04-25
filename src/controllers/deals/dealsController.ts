@@ -232,6 +232,8 @@ export const createDeal = async (
       return res.status(401).json({ message: "Usuario no autenticado" });
     }
 
+    console.log(req.body);
+
     // Crear el deal con los campos correctos
     const newDeal = await Deals.create({
       title: title, // Mapea name a title
@@ -261,7 +263,7 @@ export const createDeal = async (
       const acquisitions = products.map((product: any) => ({
         organizationId: req.user?.organizationId,
         clientId: associatedContactId,
-        productId: product.productId,
+        productId: product.id,
         variantId: product.variantId,
         dealId: newDeal._id,
         quantity: parseInt(product.quantity) || 1, // Convertir a número porque viene como string
