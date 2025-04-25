@@ -1,7 +1,11 @@
 import { Request, Response } from "express";
 import Quotation from "../../models/QuotationModel";
 import OrganizationModel from "../../models/OrganizationModel";
-import { generateQuotationPdf, getPdfAsBase64, getQuotationPdfFilename } from "../../services/quotation/printQuotationService";
+import {
+  generateQuotationPdf,
+  getPdfAsBase64,
+  getQuotationPdfFilename,
+} from "../../services/quotation/printQuotationService";
 import puppeteer from "puppeteer";
 import ejs from "ejs";
 import path from "path";
@@ -36,8 +40,6 @@ export const getQuotations = async (req: Request, res: Response) => {
     const limit = parseInt(req.query.limit as string) || 10;
     const page = parseInt(req.query.page as string) || 1;
     const skip = (page - 1) * limit;
-
-    console.log(organizationId);
 
     const quotations = await Quotation.find({ organizationId })
       .sort({ creationDate: -1, quotationNumber: -1 })
@@ -91,10 +93,16 @@ export const searchQuotation = async (req: Request, res: Response) => {
     const { term } = req.query;
     const organizationId = req.user?.organizationId;
 
-    const quotations = await Quotation.find({
-      name: { $regex: term, $options: "i" },
+    if (!term) {
+      return res.status(400).json({ message: "Term is required" });
+    }
+
+    const query = {
+      $or: [{ contactId: term }, { name: { $regex: term, $options: "i" } }],
       organizationId,
-    })
+    };
+
+    const quotations = await Quotation.find(query)
       .populate("contactId")
       .sort({ creationDate: -1 });
 
@@ -121,6 +129,7 @@ export const searchQuotation = async (req: Request, res: Response) => {
           lastName,
           email,
           mobile,
+          id: contact._id,
         },
       };
     });
@@ -167,7 +176,6 @@ export const createQuotation = async (req: Request, res: Response) => {
       const number = await OrganizationModel.findByIdAndUpdate(organizationId, {
         $inc: { "settings.quotations.quotationNumber": 1 },
       });
-      console.log(number);
     }
 
     res.status(201).json(newQuotation);
@@ -222,13 +230,17 @@ export const printQuotation = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const organizationId = req.user?.organizationId;
-    console.log(id, organizationId);
     if (!organizationId) {
-      return res.status(400).json({ message: "ID de organización no proporcionado" });
+      return res
+        .status(400)
+        .json({ message: "ID de organización no proporcionado" });
     }
 
     // Utilizar el servicio para generar el PDF
-    const { pdfBuffer } = await generateQuotationPdf(id, organizationId.toString());
+    const { pdfBuffer } = await generateQuotationPdf(
+      id,
+      organizationId.toString()
+    );
 
     // Enviar el PDF como respuesta
     res.setHeader("Content-Type", "application/pdf");
@@ -239,38 +251,41 @@ export const printQuotation = async (req: Request, res: Response) => {
     res.status(200).end(pdfBuffer);
   } catch (error) {
     console.error("Error generando la cotización en PDF:", error);
-    res.status(500).json({ 
+    res.status(500).json({
       message: "Error generando la cotización en PDF",
-      error: error instanceof Error ? error.message : "Error desconocido"
+      error: error instanceof Error ? error.message : "Error desconocido",
     });
   }
 };
 
 export const sendQuotationEmail = async (req: Request, res: Response) => {
   try {
-    const { quotationNumber, to, from, subject, message, templateId } = req.body;
+    const { quotationNumber, to, from, subject, message, templateId } =
+      req.body;
     const organizationId = req.user?.organizationId;
 
     const emailConfig = await IntegrationsModel.findOne({
       organizationId,
-      service: "brevo"
+      service: "brevo",
     });
 
     if (!emailConfig) {
       return res.status(400).json({ message: "Email configuration not found" });
-    } 
+    }
 
     const config = emailConfig.credentials;
 
     const apiKey = config.apiKey;
 
     if (!quotationNumber || !to || !subject || !organizationId) {
-      return res.status(400).json({ message: "Faltan datos requeridos para enviar el correo" });
+      return res
+        .status(400)
+        .json({ message: "Faltan datos requeridos para enviar el correo" });
     }
 
     // Utilizar el servicio para generar el PDF
-    const { pdfBuffer} = await generateQuotationPdf(
-      quotationNumber, 
+    const { pdfBuffer } = await generateQuotationPdf(
+      quotationNumber,
       organizationId.toString()
     );
 
@@ -278,7 +293,9 @@ export const sendQuotationEmail = async (req: Request, res: Response) => {
     const pdfBase64 = getPdfAsBase64(pdfBuffer);
 
     // Importar el servicio de Brevo
-    const { sendEmailWithBrevo } = require('../../services/email/brevoEmailService');
+    const {
+      sendEmailWithBrevo,
+    } = require("../../services/email/brevoEmailService");
 
     // Definir la interfaz EmailParams para usar en emailParams
     interface EmailParams {
@@ -301,12 +318,10 @@ export const sendQuotationEmail = async (req: Request, res: Response) => {
     const emailHtml = `
       <div style="font-family: Arial, sans-serif; line-height: 1.6;">
         <h2>Cotización #${quotationNumber}</h2>
-        <p>${message || 'Adjunto encontrará la cotización solicitada.'}</p>
+        <p>${message || "Adjunto encontrará la cotización solicitada."}</p>
         <p>Saludos cordiales,<br>Equipo de ventas</p>
       </div>
     `;
-
-
 
     // Configurar los parámetros para el servicio de email
     const emailParams: EmailParams = {
@@ -318,29 +333,27 @@ export const sendQuotationEmail = async (req: Request, res: Response) => {
         {
           content: pdfBase64,
           name: getQuotationPdfFilename(quotationNumber),
-          contentType: 'application/pdf'
-        }
+          contentType: "application/pdf",
+        },
       ],
       organizationId: organizationId.toString(),
-      api_key: apiKey || ''
+      api_key: apiKey || "",
     };
-
 
     // Si hay templateId, añadirlo a los parámetros
     if (templateId) {
       emailParams.templateId = templateId;
     }
 
-
     // Enviar el correo con Brevo
     await sendEmailWithBrevo(emailParams);
 
     res.status(200).json({ message: "Cotización enviada correctamente" });
   } catch (error) {
-    console.error('Error al enviar cotización por correo:', error);
-    res.status(500).json({ 
+    console.error("Error al enviar cotización por correo:", error);
+    res.status(500).json({
       message: "Error enviando el correo de la cotización",
-      error: error instanceof Error ? error.message : "Error desconocido"
+      error: error instanceof Error ? error.message : "Error desconocido",
     });
   }
 };

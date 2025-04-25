@@ -70,14 +70,12 @@ export const getDeals = async (req: Request, res: Response) => {
       .populate("field")
       .exec();
 
-
     const dealProducts = await ProductAcquisitionModel.find({
       dealId: { $in: deals.map((deal) => deal._id) },
     })
       .populate("productId")
       .populate("variantId")
       .exec();
-      
 
     const dealsToSend = deals.map((deal: any) => {
       const fields = dealsFields.filter(
@@ -85,7 +83,8 @@ export const getDeals = async (req: Request, res: Response) => {
       );
 
       const dealProductsFiltered = dealProducts.filter(
-        (product) => product.dealId && product.dealId.toString() === deal._id.toString()
+        (product) =>
+          product.dealId && product.dealId.toString() === deal._id.toString()
       );
       return {
         ...deal.toObject(),
@@ -107,11 +106,8 @@ export const searchDeals = async (req: Request, res: Response) => {
     return;
   }
 
-
-
   const { organizationId } = req.user;
   const { search } = req.query;
-
 
   try {
     const deals = await Deals.find({
@@ -209,8 +205,7 @@ export const createDeal = async (
   res: Response
 ): Promise<Response> => {
   try {
-
-    console.log(req.body)
+    console.log(req.body);
     const {
       title,
       amount,
@@ -219,7 +214,7 @@ export const createDeal = async (
       status,
       pipeline,
       fields,
-      products
+      products,
     } = req.body;
 
     if (
@@ -265,19 +260,19 @@ export const createDeal = async (
     if (products && products.length > 0) {
       const acquisitions = products.map((product: any) => ({
         organizationId: req.user?.organizationId,
-        clientId: associatedContactId, 
-        productId: product.productId, 
+        clientId: associatedContactId,
+        productId: product.productId,
         variantId: product.variantId,
         dealId: newDeal._id,
         quantity: parseInt(product.quantity) || 1, // Convertir a número porque viene como string
         priceAtAcquisition: parseFloat(product.priceAtAcquisition) || 0, // Convertir a número
         acquisitionDate: new Date(closingDate),
         status: "active",
-        userId: req.user?._id
+        userId: req.user?._id,
       }));
-      
+
       console.log(acquisitions);
-      
+
       // Crear todas las adquisiciones en una sola operación
       await ProductAcquisitionModel.insertMany(acquisitions);
     }
@@ -309,7 +304,7 @@ export const getDealDetails = async (
   try {
     const dealId = req.params.id;
 
-    console.log(dealId,1);
+    console.log(dealId, 1);
 
     const deal = await Deals.findOne({ _id: dealId })
       .populate("associatedContactId")
@@ -407,15 +402,9 @@ export const editDeal = async (
 ): Promise<Response> => {
   try {
     const dealId = req.params.id;
-    const { deal, fields } = req.body;
+    const deal = req.body;
 
-    if (
-      !deal.title ||
-      !deal.amount ||
-      !deal.closingDate ||
-      !deal.pipeline ||
-      !deal.status
-    ) {
+    if (!deal.title || !deal.amount || !deal.closingDate || !deal.status) {
       return res.status(400).json({ message: "Faltan campos obligatorios" });
     }
 
@@ -427,15 +416,39 @@ export const editDeal = async (
       return res.status(404).json({ message: "Trato no encontrado" });
     }
 
+    // Actualizar campos personalizados
     await DealsFieldsValues.deleteMany({ deal: dealId }).exec();
 
-    const dealFields = fields.map((field: any) => ({
+    const dealFields = deal.fields.map((field: any) => ({
       deal: dealId,
-      field: field.fieldId,
+      field: field.field,
       value: field.value,
     }));
 
     await DealsFieldsValues.insertMany(dealFields);
+
+    // Manejar actualización de productos
+    if (deal.dealProducts && deal.dealProducts.length > 0) {
+      // Eliminar productos anteriores asociados a este trato
+      await ProductAcquisitionModel.deleteMany({ dealId }).exec();
+
+      // Crear nuevas adquisiciones de productos
+      const acquisitions = deal.dealProducts.map((product: any) => ({
+        organizationId: req.user?.organizationId,
+        clientId: deal.associatedContactId,
+        productId: product.id,
+        variantId: product.variantId || "",
+        dealId: dealId,
+        quantity: parseInt(product.quantity) || 1,
+        priceAtAcquisition: parseFloat(product.priceAtAcquisition) || 0,
+        acquisitionDate: new Date(deal.closingDate),
+        status: "active",
+        userId: req.user?._id,
+      }));
+
+      // Insertar las nuevas adquisiciones
+      await ProductAcquisitionModel.insertMany(acquisitions);
+    }
 
     return res.status(200).json({ message: "Deal updated" });
   } catch (error) {
