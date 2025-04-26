@@ -8,6 +8,17 @@ enum RuleCondition {
   GREATER_THAN = "greater_than", // La propiedad es mayor que un valor (numérico)
   LESS_THAN = "less_than", // La propiedad es menor que un valor (numérico)
   IN_LIST = "in_list", // La propiedad está en una lista de valores
+  LAST_DEAL_OLDER_THAN = "last_deal_older_than",
+  LAST_DEAL_NEWER_THAN = "last_deal_newer_than",
+  DEAL_AMOUNT_GREATER_THAN = "deal_amount_greater_than",
+  DEAL_AMOUNT_LESS_THAN = "deal_amount_less_than",
+  DEAL_STATUS_IS = "deal_status_is",
+  DEAL_PIPELINE_IS = "deal_pipeline_is",
+  TOTAL_DEALS_COUNT_GREATER_THAN = "total_deals_count_greater_than",
+  TOTAL_DEALS_AMOUNT_GREATER_THAN = "total_deals_amount_greater_than",
+  HAS_PURCHASED_PRODUCT = "has_purchased_product",
+  PURCHASE_FREQUENCY_LESS_THAN = "purchase_frequency_less_than",
+  DEAL_FIELD_VALUE_IS = "deal_field_value_is",
 }
 
 interface IRule {
