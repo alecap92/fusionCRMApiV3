@@ -73,7 +73,7 @@ router.get("/emails", verifyToken, fetchEmails); // Obtener correos
 router.post("/emails/sync", verifyToken, syncOldMails); // Sincronizar correos antiguos
 router.post("/emails/new", verifyToken, saveNewEmails); // Guardar nuevos correos
 router.get("/emails/:id", verifyToken, fetchEmail); // Obtener detalles de un correo
-router.post("/emails", verifyToken, upload.array("attachments"), sendEmail); // Enviar un correo
+router.post("/send", verifyToken, upload.array("attachments"), sendEmail); // Enviar un correo
 router.delete("/emails/:id", verifyToken, deleteEmail); // Eliminar un correo
 
 router.put("/emails/:id", verifyToken, updateEmail); // Actualizar propiedades de un correo

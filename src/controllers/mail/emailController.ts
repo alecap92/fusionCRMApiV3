@@ -79,33 +79,51 @@ export const sendEmail = async (req: Request, res: Response) => {
         .json({ error: "SMTP settings not found for user." });
     }
 
-    // Asegúrate de tratar los valores como cadenas planas
-    const to = req.body.to?.toString();
-    const subject = req.body.subject?.toString();
-    const text = req.body.text?.toString();
-    const html = req.body.html?.toString() || req.body.message?.toString();
+    // Leer y parsear los campos del form-data
+    let to: string[] = [];
+    if (typeof req.body.to === "string") {
+      try {
+        to = JSON.parse(req.body.to);
+      } catch {
+        to = [req.body.to];
+      }
+    } else if (Array.isArray(req.body.to)) {
+      to = req.body.to;
+    }
 
-    if (!to || !subject || (!text && !html)) {
-      console.error("Validation Error: Missing required fields.", req.body);
+    const subject = req.body.subject?.toString();
+    const content = req.body.content;
+
+    if (!to.length || !subject || !content) {
       return res.status(400).json({
-        error:
-          "Recipient (to), subject, and either text or HTML body are required.",
+        error: "Recipient (to), subject, and content are required.",
       });
     }
 
+    // Procesar adjuntos desde req.files (Multer)
     let attachments: { filename: string; content: Buffer }[] = [];
-    if (Array.isArray(req.files)) {
+    if (req.files && Array.isArray(req.files)) {
       attachments = req.files.map((file: Express.Multer.File) => ({
         filename: file.originalname,
         content: file.buffer,
       }));
+    } else if (req.files && typeof req.files === "object") {
+      // Si usas upload.fields([{ name: 'attachments' }])
+      const filesArray = (
+        req.files as { [fieldname: string]: Express.Multer.File[] }
+      )["attachments"];
+      if (Array.isArray(filesArray)) {
+        attachments = filesArray.map((file) => ({
+          filename: file.originalname,
+          content: file.buffer,
+        }));
+      }
     }
 
     const result = await sendEmailViaSMTP(user.emailSettings.smtpSettings, {
-      to,
+      to: to.join(","), // nodemailer espera string separado por comas
       subject,
-      text,
-      html,
+      html: content,
       attachments,
     });
 

@@ -69,7 +69,7 @@ exports.fetchEmail = fetchEmail;
  * Envía un correo electrónico a través de SMTP.
  */
 const sendEmail = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    var _a, _b, _c, _d, _e, _f, _g;
+    var _a, _b, _c;
     try {
         const userId = (_a = req.user) === null || _a === void 0 ? void 0 : _a._id;
         if (!userId) {
@@ -81,29 +81,48 @@ const sendEmail = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
                 .status(400)
                 .json({ error: "SMTP settings not found for user." });
         }
-        // Asegúrate de tratar los valores como cadenas planas
-        const to = (_c = req.body.to) === null || _c === void 0 ? void 0 : _c.toString();
-        const subject = (_d = req.body.subject) === null || _d === void 0 ? void 0 : _d.toString();
-        const text = (_e = req.body.text) === null || _e === void 0 ? void 0 : _e.toString();
-        const html = ((_f = req.body.html) === null || _f === void 0 ? void 0 : _f.toString()) || ((_g = req.body.message) === null || _g === void 0 ? void 0 : _g.toString());
-        if (!to || !subject || (!text && !html)) {
-            console.error("Validation Error: Missing required fields.", req.body);
+        // Leer y parsear los campos del form-data
+        let to = [];
+        if (typeof req.body.to === "string") {
+            try {
+                to = JSON.parse(req.body.to);
+            }
+            catch (_d) {
+                to = [req.body.to];
+            }
+        }
+        else if (Array.isArray(req.body.to)) {
+            to = req.body.to;
+        }
+        const subject = (_c = req.body.subject) === null || _c === void 0 ? void 0 : _c.toString();
+        const content = req.body.content;
+        if (!to.length || !subject || !content) {
             return res.status(400).json({
-                error: "Recipient (to), subject, and either text or HTML body are required.",
+                error: "Recipient (to), subject, and content are required.",
             });
         }
+        // Procesar adjuntos desde req.files (Multer)
         let attachments = [];
-        if (Array.isArray(req.files)) {
+        if (req.files && Array.isArray(req.files)) {
             attachments = req.files.map((file) => ({
                 filename: file.originalname,
                 content: file.buffer,
             }));
         }
+        else if (req.files && typeof req.files === "object") {
+            // Si usas upload.fields([{ name: 'attachments' }])
+            const filesArray = req.files["attachments"];
+            if (Array.isArray(filesArray)) {
+                attachments = filesArray.map((file) => ({
+                    filename: file.originalname,
+                    content: file.buffer,
+                }));
+            }
+        }
         const result = yield (0, smtpClient_1.sendEmailViaSMTP)(user.emailSettings.smtpSettings, {
-            to,
+            to: to.join(","), // nodemailer espera string separado por comas
             subject,
-            text,
-            html,
+            html: content,
             attachments,
         });
         res.status(200).json({

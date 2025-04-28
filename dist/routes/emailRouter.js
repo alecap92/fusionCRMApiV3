@@ -40,7 +40,7 @@ router.get("/emails", authMiddleware_1.verifyToken, emailController_1.fetchEmail
 router.post("/emails/sync", authMiddleware_1.verifyToken, syncController_1.syncOldMails); // Sincronizar correos antiguos
 router.post("/emails/new", authMiddleware_1.verifyToken, emailController_1.saveNewEmails); // Guardar nuevos correos
 router.get("/emails/:id", authMiddleware_1.verifyToken, emailController_1.fetchEmail); // Obtener detalles de un correo
-router.post("/emails", authMiddleware_1.verifyToken, upload.array("attachments"), emailController_1.sendEmail); // Enviar un correo
+router.post("/send", authMiddleware_1.verifyToken, upload.array("attachments"), emailController_1.sendEmail); // Enviar un correo
 router.delete("/emails/:id", authMiddleware_1.verifyToken, emailController_1.deleteEmail); // Eliminar un correo
 router.put("/emails/:id", authMiddleware_1.verifyToken, emailController_1.updateEmail); // Actualizar propiedades de un correo
 // **/folders**
