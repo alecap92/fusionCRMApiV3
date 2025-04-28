@@ -22,6 +22,7 @@ interface IContact extends Document {
   updatedAt: Date;
   EmployeeOwner: string[];
   files: IFile[];
+  leadScore: number;
 }
 
 const propertySchema = new Schema<IProperty>({
@@ -79,6 +80,10 @@ const contactSchema = new Schema<IContact>({
     },
   ],
   files: [fileSchema],
+  leadScore: {
+    type: Number,
+    default: 0,
+  },
 });
 
 export default model<IContact>("Contact", contactSchema);

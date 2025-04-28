@@ -1,7 +1,6 @@
 import { Request, Response } from "express";
 import Contact from "../../models/ContactModel";
 import DealsModel from "../../models/DealsModel";
-import { calculateContactScore } from "../../utils/leadScoring";
 
 // Interface para los filtros avanzados
 interface FilterCondition {
@@ -33,9 +32,6 @@ export const getContact = async (req: Request, res: Response) => {
         ? deals.reduce((a, b) => (a.createdAt > b.createdAt ? a : b))
         : null;
 
-    // Calcular el lead score bajo demanda
-    const leadScore = await calculateContactScore(contactId, organizationId);
-
     return res.status(200).json({
       contact,
       deals,
@@ -45,10 +41,8 @@ export const getContact = async (req: Request, res: Response) => {
         totalDeals: deals.length,
         totalNotes: 0,
         lastDeal,
-        leadScore,
       },
       conversations: [],
-      leadScore,
     });
   } catch (error) {
     console.error("Error obteniendo el contacto:", error);

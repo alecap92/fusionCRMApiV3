@@ -2,6 +2,7 @@ import { Request, Response } from "express";
 import XLSX from "xlsx";
 import ContactModel from "../../models/ContactModel";
 export const importContacts = async (req: Request, res: Response) => {
+  console.log(req.user);
   const userId = req.user?._id;
   const organizationId = req.user?.organizationId;
 
@@ -39,7 +40,12 @@ export const importContacts = async (req: Request, res: Response) => {
 
     const headers = data[0];
 
-    const contacts = data.slice(1).map((row) => {
+    const contactsToImport = [];
+    const duplicates = [];
+    const processed = [];
+
+    // Procesar cada fila
+    for (const row of data.slice(1)) {
       const properties = headers
         .map((header, index) => {
           const mappedKey = mapping[header];
@@ -76,24 +82,77 @@ export const importContacts = async (req: Request, res: Response) => {
         })
         .filter((property) => property !== null);
 
-      return {
-        properties,
-        EmployeeOwner: [userId],
-        source: "imported",
-        organizationId,
-      };
-    });
+      // Extraer email y mobile para la verificación de duplicados
+      let email = "";
+      let mobile = "";
 
-    // Procesar en lotes
-    const batchSize = 1000;
-    for (let i = 0; i < contacts.length; i += batchSize) {
-      const batch = contacts.slice(i, i + batchSize);
-      await ContactModel.insertMany(batch);
+      for (const prop of properties) {
+        if (prop.key === "email") {
+          email = prop.value;
+        } else if (prop.key === "mobile" || prop.key === "cellphone") {
+          mobile = prop.value;
+        }
+      }
+
+      // Verificar si el contacto ya existe (por email o mobile)
+      let existingContact: any = null;
+
+      if (email && typeof email === "string" && email.trim() !== "") {
+        existingContact = await ContactModel.findOne({
+          organizationId,
+          "properties.key": "email",
+          "properties.value": email,
+        });
+      }
+
+      if (
+        !existingContact &&
+        mobile &&
+        typeof mobile === "string" &&
+        mobile.trim() !== ""
+      ) {
+        existingContact = await ContactModel.findOne({
+          organizationId,
+          $or: [
+            { "properties.key": "mobile", "properties.value": mobile },
+            { "properties.key": "cellphone", "properties.value": mobile },
+          ],
+        });
+      }
+
+      if (existingContact) {
+        duplicates.push({
+          id: existingContact._id.toString(),
+          properties: existingContact.properties,
+        });
+      } else {
+        const newContact = {
+          properties,
+          EmployeeOwner: [userId],
+          source: "imported",
+          organizationId,
+        };
+        contactsToImport.push(newContact);
+        processed.push(row);
+      }
+    }
+
+    // Procesar en lotes solo los contactos nuevos
+    let importedCount = 0;
+    if (contactsToImport.length > 0) {
+      const batchSize = 1000;
+      for (let i = 0; i < contactsToImport.length; i += batchSize) {
+        const batch = contactsToImport.slice(i, i + batchSize);
+        await ContactModel.insertMany(batch);
+      }
+      importedCount = contactsToImport.length;
     }
 
     res.status(201).json({
       message: "Contactos importados exitosamente",
-      importedCount: contacts.length,
+      importedCount: importedCount,
+      duplicatesCount: duplicates.length,
+      totalProcessed: processed.length,
     });
   } catch (error: any) {
     console.error("Error al importar contactos:", error);

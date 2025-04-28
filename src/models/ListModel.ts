@@ -22,7 +22,13 @@ const FilterSchema = new Schema<IFilter>(
     id: { type: String, required: true },
     key: { type: String, required: true },
     operator: { type: String, required: true },
-    value: { type: String, required: true },
+    value: {
+      type: String,
+      required: function (this: any) {
+        // No requiere value cuando el operador es "is empty" o "is not empty"
+        return !["is empty", "is not empty"].includes(this.operator);
+      },
+    },
   },
   { _id: false } // para evitar crear un _id por cada filtro
 );

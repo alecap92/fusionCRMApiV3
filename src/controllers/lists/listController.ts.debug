@@ -1,0 +1,478 @@
+import { Request, Response } from "express";
+import List from "../../models/ListModel";
+import Contact from "../../models/ContactModel";
+import DealsModel from "../../models/DealsModel";
+import ExcelJS from "exceljs";
+import { calculateContactsScores } from "../../utils/leadScoring";
+
+// Crear Lista Estática
+export const createStaticList = async (req: Request, res: Response) => {
+  try {
+    const startTime = Date.now();
+    console.log("=== INICIO CREACIÓN DE LISTA ESTÁTICA (DEBUG) ===");
+    const { name, description, filters } = req.body;
+    const userId = req.user?._id;
+    const organizationId = req.user?.organizationId;
+
+    console.log("Datos recibidos:", {
+      name,
+      description,
+      userId,
+      organizationId,
+      filters:
+        JSON.stringify(filters).substring(0, 200) +
+        (JSON.stringify(filters).length > 200 ? "..." : ""),
+    });
+
+    if (!filters) {
+      console.error("Error: No se recibieron filtros");
+      return res
+        .status(400)
+        .json({ message: "Se requieren filtros para crear la lista" });
+    }
+
+    const { Deals, Contacts } = filters;
+    console.log("DEBUG - Estructura de filters:", {
+      tipoDeFilters: typeof filters,
+      esArray: Array.isArray(filters),
+      tipoDeDeals: typeof Deals,
+      esArrayDeals: Array.isArray(Deals),
+      dealsContent: Deals ? JSON.stringify(Deals) : 'undefined'
+    });
+
+    // Build contact query using aggregation
+    type OperatorType =
+      | "contains"
+      | "equals"
+      | "starts with"
+      | "ends with"
+      | "is empty"
+      | "is not empty"
+      | "greater_than"
+      | "less_than";
+
+    const operatorMap = {
+      contains: (value: string) => ({ $regex: value, $options: "i" }),
+      equals: (value: string) => value,
+      "starts with": (value: string) => ({
+        $regex: `^${value}`,
+        $options: "i",
+      }),
+      "ends with": (value: string) => ({ $regex: `${value}$`, $options: "i" }),
+      "is empty": () => ({ $in: ["", null] }),
+      "is not empty": () => ({ $nin: ["", null] }),
+      greater_than: (value: string) => ({ $gt: Number(value) }),
+      less_than: (value: string) => ({ $lt: Number(value) }),
+    };
+
+    console.log("Intentando construir consulta de contactos...");
+    console.log("FILTROS RECIBIDOS:", JSON.stringify(filters));
+    console.time("construir_query");
+
+    // Verificar estructura de filtros para consulta MongoDB
+    if (!Array.isArray(filters)) {
+      console.error(
+        "Error: filters no es un array para la consulta de contactos"
+      );
+      console.log("Tipo de filters:", typeof filters);
+      console.log("Contenido de filters:", filters);
+      return res.status(400).json({
+        message: "Formato de filtros incorrecto. Se espera un array.",
+      });
+    }
+
+    // Separar filtros de leadScore
+    const leadScoreFilter = filters.find(
+      (filter) => filter.key === "leadScore"
+    );
+    const regularFilters = filters.filter(
+      (filter) => filter.key !== "leadScore"
+    );
+    const onlyLeadScoreFilter = leadScoreFilter && regularFilters.length === 0;
+
+    console.log(
+      `Filtros de leadScore: ${leadScoreFilter ? 1 : 0}, Filtros regulares: ${regularFilters.length}`
+    );
+    console.log("¿Solo filtros de leadScore?", onlyLeadScoreFilter);
+    console.log("Filtros regulares detalle:", JSON.stringify(regularFilters));
+
+    // Construir consulta para todos los filtros
+    let contactQuery: any = { organizationId };
+
+    // Añadir condición de leadScore directamente a la consulta principal si existe
+    if (leadScoreFilter) {
+      console.log(
+        "Añadiendo filtro de leadScore a la consulta principal:",
+        leadScoreFilter
+      );
+
+      let leadScoreCondition: any;
+
+      switch (leadScoreFilter.operator) {
+        case "greater_than":
+          leadScoreCondition = {
+            leadScore: { $gt: Number(leadScoreFilter.value) },
+          };
+          break;
+        case "less_than":
+          leadScoreCondition = {
+            leadScore: { $lt: Number(leadScoreFilter.value) },
+          };
+          break;
+        case "equals":
+          leadScoreCondition = { leadScore: Number(leadScoreFilter.value) };
+          break;
+        default:
+          console.warn(
+            `Operador de leadScore no soportado: ${leadScoreFilter.operator}, se usará $gt por defecto`
+          );
+          leadScoreCondition = {
+            leadScore: { $gt: Number(leadScoreFilter.value) },
+          };
+      }
+
+      if (!contactQuery.$and) {
+        contactQuery.$and = [];
+      }
+      contactQuery.$and.push(leadScoreCondition);
+    }
+
+    // Añadir filtros regulares a la consulta
+    if (regularFilters.length > 0) {
+      if (!contactQuery.$and) {
+        contactQuery.$and = [];
+      }
+
+      const regularConditions = regularFilters.map(
+        (filter: { key: string; operator: OperatorType; value: string }) => {
+          console.log("DEBUG - Procesando filtro regular:", JSON.stringify(filter));
+
+          if (!filter.key || !filter.operator) {
+            console.warn("Filtro incompleto:", filter);
+          }
+
+          const operatorFn = operatorMap[filter.operator];
+          if (!operatorFn) {
+            console.warn(`Operador desconocido: ${filter.operator}`);
+          }
+
+          // DEBUG: Versión original usando $and
+          const originalCondition = {
+            $and: [
+              { "properties.key": filter.key },
+              {
+                "properties.value": operatorFn?.(filter.value) || {
+                  $regex: filter.value,
+                  $options: "i",
+                },
+              },
+            ],
+          };
+
+          // DEBUG: Versión usando $elemMatch (prueba alternativa)
+          const elemMatchCondition = {
+            properties: {
+              $elemMatch: {
+                key: filter.key,
+                value: operatorFn?.(filter.value) || {
+                  $regex: filter.value,
+                  $options: "i",
+                },
+              }
+            }
+          };
+
+          // Por el momento, mantenemos la versión original para reproducir el problema
+          const finalCondition = originalCondition;
+          console.log("DEBUG - Condición generada:", JSON.stringify(finalCondition));
+          return finalCondition;
+        }
+      );
+
+      contactQuery.$and.push(...regularConditions);
+    }
+    console.timeEnd("construir_query");
+
+    console.log("Consulta de contactos generada:");
+    console.log(JSON.stringify(contactQuery, null, 2));
+
+    // Verificar primero cuántos contactos coinciden antes de obtener IDs
+    console.time("contar_contactos");
+    const contactCount = await Contact.countDocuments(contactQuery).exec();
+    console.timeEnd("contar_contactos");
+    console.log(`Coinciden ${contactCount} contactos con los filtros`);
+
+    if (contactCount === 0) {
+      console.log("DEBUG - No se encontraron contactos con los filtros aplicados");
+      console.log("DEBUG - Realizando prueba con $elemMatch para ver si funciona mejor");
+      
+      // Construir consulta alternativa usando $elemMatch
+      let elemMatchQuery: any = { organizationId };
+      let andConditions: any[] = [];
+      
+      if (leadScoreFilter) {
+        andConditions.push({
+          leadScore: { $gt: Number(leadScoreFilter.value) }
+        });
+      }
+      
+      for (const filter of regularFilters) {
+        const operatorFn = operatorMap[filter.operator as OperatorType];
+        if (!operatorFn) continue;
+        
+        andConditions.push({
+          properties: {
+            $elemMatch: {
+              key: filter.key,
+              value: operatorFn(filter.value)
+            }
+          }
+        });
+      }
+      
+      if (andConditions.length > 0) {
+        elemMatchQuery.$and = andConditions;
+      }
+      
+      console.log("DEBUG - Consulta alternativa con $elemMatch:");
+      console.log(JSON.stringify(elemMatchQuery, null, 2));
+      
+      const elemMatchCount = await Contact.countDocuments(elemMatchQuery).exec();
+      console.log(`DEBUG - Con $elemMatch, coinciden ${elemMatchCount} contactos`);
+      
+      // Verificar contacto específico para depuración
+      console.log("DEBUG - Verificando contacto específico:");
+      const sampleContact = await Contact.findOne({
+        "properties.key": "companyType",
+        "properties.value": "Hospitales e IPS"
+      }).lean().exec();
+      
+      console.log("DEBUG - ¿Se encontró algún contacto con companyType=Hospitales e IPS?", !!sampleContact);
+      if (sampleContact) {
+        console.log("DEBUG - Muestra de propiedades:", 
+          sampleContact.properties.map((p: any) => `${p.key}: ${p.value}`).join(', '));
+      }
+    }
+
+    // Verificar si la lista inicial es demasiado grande
+    if (contactCount > 5000) {
+      console.log(
+        `Lista demasiado grande: ${contactCount} contactos coinciden con los filtros básicos`
+      );
+      return res.status(400).json({
+        message:
+          "La consulta devuelve demasiados contactos (más de 5000), por favor añada más filtros específicos",
+        contactCount: contactCount,
+      });
+    }
+
+    // Get contact IDs
+    console.log("Buscando contactos con la consulta generada...");
+    console.time("buscar_contactos");
+    let contactIds = await Contact.find(contactQuery)
+      .select("_id properties")  // Agregar 'properties' para depuración
+      .lean()
+      .exec()
+      .then((contacts) => {
+        console.log(`DEBUG - Contactos encontrados: ${contacts.length}`);
+        if (contacts.length > 0) {
+          // Mostrar una muestra de los contactos encontrados
+          const sampleContact = contacts[0];
+          if (sampleContact.properties) {
+            console.log("DEBUG - Ejemplo de propiedades del primer contacto:", 
+              sampleContact.properties.map((p: any) => `${p.key}: ${p.value}`).join(', '));
+          }
+        }
+        return contacts.map((contact) => contact._id);
+      });
+    console.timeEnd("buscar_contactos");
+
+    console.log(
+      `Encontrados ${contactIds.length} contactos en ${Date.now() - startTime}ms`
+    );
+
+    // Verificar si la lista es demasiado grande (más de 2000 contactos)
+    if (contactIds.length > 2000) {
+      console.log(`Lista demasiado grande: ${contactIds.length} contactos`);
+      const executionTime = Date.now() - startTime;
+      return res.status(400).json({
+        message:
+          "La lista es muy grande, por favor añada más filtros para reducir el número de contactos",
+        contactCount: contactIds.length,
+        executionTime: `${executionTime}ms`,
+      });
+    }
+
+    // Process deals filters if they exist
+    if (Array.isArray(Deals) && Deals.length > 0) {
+      console.log("DEBUG - Procesando filtros de deals:", JSON.stringify(Deals));
+      console.time("procesar_deals");
+
+      const hasDealsFilter = Deals.find(
+        (filter) => filter.field === "hasDeals"
+      );
+
+      if (hasDealsFilter) {
+        console.log("DEBUG - Filtro hasDeals encontrado:", JSON.stringify(hasDealsFilter));
+        console.log("DEBUG - Valor del filtro hasDeals:", hasDealsFilter.value);
+        console.log("DEBUG - Tipo del valor:", typeof hasDealsFilter.value);
+      }
+
+      if (contactIds.length === 0) {
+        console.log("DEBUG - No hay contactIds para filtrar por deals, se omitirá este paso");
+        console.timeEnd("procesar_deals");
+      } else {
+        // Build deals query
+        const dealsQuery = {
+          associatedContactId: { $in: contactIds },
+          ...Deals.reduce((acc, filter) => {
+            if (filter.field === "hasDeals") return acc;
+
+            console.log("Procesando filtro de deals:", filter);
+
+            type Condition =
+              | "equals"
+              | "not_equals"
+              | "greater_than"
+              | "less_than"
+              | "contains"
+              | "not_contains";
+            const conditions = {
+              equals: (val: any) => val,
+              not_equals: (val: any) => ({ $ne: val }),
+              greater_than: (val: any) => ({ $gt: val }),
+              less_than: (val: any) => ({ $lt: val }),
+              contains: (val: any) => ({ $regex: val, $options: "i" }),
+              not_contains: (val: any) => ({
+                $not: { $regex: val, $options: "i" },
+              }),
+            };
+
+            const conditionFn = conditions[filter.condition as Condition];
+            if (!conditionFn) {
+              console.warn(`Condición de deal desconocida: ${filter.condition}`);
+            }
+
+            return {
+              [filter.field]: conditionFn?.(filter.value),
+            };
+          }, {}),
+        };
+
+        console.log("DEBUG - Consulta de deals generada:");
+        console.log(JSON.stringify(dealsQuery, null, 2));
+
+        console.log("DEBUG - Buscando deals asociados a los contactos...");
+        const deals = await DealsModel.distinct(
+          "associatedContactId",
+          dealsQuery
+        );
+        console.log(
+          `DEBUG - Encontrados ${deals.length} deals asociados en ${Date.now() - startTime}ms`
+        );
+
+        const dealsSet = new Set(deals.map((id) => id.toString()));
+        console.log("DEBUG - Contactos con deals:", dealsSet.size);
+        
+        // DEBUG: Mostrar algunos IDs de contactos con deals
+        if (dealsSet.size > 0) {
+          console.log("DEBUG - Muestra de IDs de contactos con deals:", 
+            Array.from(dealsSet).slice(0, 3));
+        }
+
+        if (hasDealsFilter) {
+          const contactIdsBeforeFilter = contactIds.length;
+          
+          // DEBUG: Procesar uno por uno para depurar
+          const filteredIds: any[] = [];
+          for (const id of contactIds) {
+            const idStr = id.toString();
+            const hasDeals = dealsSet.has(idStr);
+            const keepContact = hasDealsFilter.value === hasDeals;
+            console.log(`DEBUG - Contacto ${idStr}: tiene deals = ${hasDeals}, mantener = ${keepContact}`);
+            
+            if (keepContact) {
+              filteredIds.push(id);
+            }
+          }
+          
+          contactIds = filteredIds;
+          
+          console.log(
+            `DEBUG - Filtro hasDeals aplicado: ${contactIdsBeforeFilter} → ${contactIds.length} contactos`
+          );
+
+          // Verificar nuevamente si la lista sigue siendo demasiado grande después de filtrar por deals
+          if (contactIds.length > 2000) {
+            console.log(
+              `Lista sigue siendo demasiado grande después de filtrar por deals: ${contactIds.length} contactos`
+            );
+            const executionTime = Date.now() - startTime;
+            return res.status(400).json({
+              message:
+                "La lista es muy grande, por favor añada más filtros para reducir el número de contactos",
+              contactCount: contactIds.length,
+              executionTime: `${executionTime}ms`,
+            });
+          }
+        }
+        console.timeEnd("procesar_deals");
+      }
+    }
+
+    // Create and save list
+    console.log(
+      "Creando nueva lista con",
+      contactIds.length,
+      "contactos en",
+      Date.now() - startTime,
+      "ms"
+    );
+    console.time("guardar_lista");
+
+    console.log(
+      "Tipo de filtros antes de crear la lista:",
+      typeof filters,
+      Array.isArray(filters)
+    );
+
+    const list = new List({
+      name,
+      description,
+      filters: filters,
+      contactIds,
+      isDynamic: false,
+      userId,
+      organizationId,
+    });
+
+    console.log("Guardando lista en la base de datos...");
+    await list.save();
+    console.timeEnd("guardar_lista");
+
+    const executionTime = Date.now() - startTime;
+    console.log(
+      `Lista guardada exitosamente. Tiempo total de ejecución: ${executionTime}ms`
+    );
+
+    console.log("=== FIN CREACIÓN DE LISTA ESTÁTICA (DEBUG) ===");
+    res.status(201).json({
+      ...list.toObject(),
+      executionTime: `${executionTime}ms`,
+      contactCount: contactIds.length,
+    });
+  } catch (error) {
+    console.error("=== ERROR EN CREACIÓN DE LISTA ESTÁTICA ===");
+    console.error("Detalles del error:", error);
+    if (error instanceof Error) {
+      console.error("Mensaje:", error.message);
+      console.error("Stack:", error.stack);
+    }
+    res.status(500).json({
+      message: "Error creando la lista estática",
+      error,
+      errorMessage:
+        error instanceof Error ? error.message : "Error desconocido",
+    });
+  }
+}; 

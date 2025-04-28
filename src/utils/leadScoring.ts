@@ -54,6 +54,8 @@ export const recalculateAllLeadScores = async (
         }
       }
 
+      // Actualizar el leadScore del contacto
+      contact.leadScore = totalScore;
       await contact.save();
     }
 
@@ -62,6 +64,29 @@ export const recalculateAllLeadScores = async (
     );
   } catch (error) {
     console.error("Error al recalcular puntajes de lead scoring:", error);
+    throw error;
+  }
+};
+
+/**
+ * Recalcula el puntaje de un contacto específico
+ */
+export const recalculateContactScore = async (
+  contactId: string | Types.ObjectId,
+  organizationId: string | Types.ObjectId
+): Promise<number> => {
+  try {
+    // Convertir a ObjectId si son strings
+    const orgId =
+      typeof organizationId === "string"
+        ? new Types.ObjectId(organizationId)
+        : organizationId;
+    const contId =
+      typeof contactId === "string" ? new Types.ObjectId(contactId) : contactId;
+
+    return calculateContactScore(contId, orgId);
+  } catch (error) {
+    console.error("Error al recalcular puntaje de contacto:", error);
     throw error;
   }
 };
@@ -170,6 +195,10 @@ export const calculateContactScore = async (
       }
     }
 
+    // Actualizar el leadScore en el contacto
+    contact.leadScore = totalScore;
+    await contact.save();
+
     return totalScore;
   } catch (error) {
     console.error("Error al calcular el puntaje del contacto:", error);
@@ -178,9 +207,9 @@ export const calculateContactScore = async (
 };
 
 /**
- * Calcula los puntajes para un conjunto de contactos
- * @param contactIds Array de IDs de contactos, si no se proporciona se calculan todos
+ * Calcula los puntajes para un conjunto de contactos y actualiza sus valores de leadScore
  * @param organizationId ID de la organización
+ * @param contactIds Array de IDs de contactos, si no se proporciona se calculan todos
  * @returns Un objeto con los IDs de contactos como claves y sus puntajes como valores
  */
 export const calculateContactsScores = async (
@@ -219,6 +248,9 @@ export const calculateContactsScores = async (
     // Calcular puntajes para cada contacto
     const scores: Record<string, number> = {};
 
+    // Variable para almacenar los contactos que se actualizarán
+    const contactsToUpdate = [];
+
     for (const contact of contacts) {
       let totalScore = 0;
 
@@ -243,6 +275,21 @@ export const calculateContactsScores = async (
       if (contact._id && typeof contact._id.toString === "function") {
         scores[contact._id.toString()] = totalScore;
       }
+
+      // Actualizar el leadScore del contacto
+      if (contact.leadScore !== totalScore) {
+        contact.leadScore = totalScore;
+        contactsToUpdate.push(contact);
+      }
+    }
+
+    // Guardar todos los contactos actualizados en una sola operación bulk
+    if (contactsToUpdate.length > 0) {
+      // Utilizamos Promise.all para actualizar todos los contactos en paralelo
+      await Promise.all(contactsToUpdate.map((contact) => contact.save()));
+      console.log(
+        `Actualizados ${contactsToUpdate.length} contactos con nuevo leadScore`
+      );
     }
 
     return scores;
