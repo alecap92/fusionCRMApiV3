@@ -12,7 +12,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.openAIService = void 0;
+exports.analyseContactDetails = exports.openAIService = void 0;
 exports.generateContent = generateContent;
 exports.generateSocialContent = generateSocialContent;
 const openai_1 = __importDefault(require("openai"));
@@ -109,3 +109,100 @@ exports.openAIService = {
     generateContent,
     generateSocialContent,
 };
+/**
+ * Analyse contact details with AI: Deals, contact info, etc.
+ *
+ */
+const analyseContactDetails = (contactId, organizationId, details) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a;
+    try {
+        const openai = yield getOpenAIClient(organizationId);
+        // Extraer información relevante
+        const contactProperties = ((_a = details.details) === null || _a === void 0 ? void 0 : _a.properties) || [];
+        const deals = details.deals || [];
+        const activities = details.activities || [];
+        // Ordenar los deals por fecha de cierre (del más reciente al más antiguo)
+        const sortedDeals = [...deals].sort((a, b) => new Date(b.closingDate).getTime() - new Date(a.closingDate).getTime());
+        // Calcular métricas relevantes
+        const totalDeals = deals.length;
+        const totalRevenue = deals.reduce((sum, deal) => sum + (deal.amount || 0), 0);
+        const currentDate = new Date();
+        // Obtener la fecha del último deal
+        const lastDealDate = sortedDeals.length > 0 ? new Date(sortedDeals[0].closingDate) : null;
+        // Calcular días desde la última compra
+        const daysSinceLastPurchase = lastDealDate
+            ? Math.floor((currentDate.getTime() - lastDealDate.getTime()) / (1000 * 3600 * 24))
+            : null;
+        // Crear un objeto con información consolidada
+        const analysisData = {
+            contactInfo: Object.fromEntries(contactProperties.map((prop) => [prop.key, prop.value])),
+            dealsInfo: {
+                totalDeals,
+                totalRevenue,
+                deals: sortedDeals.map((deal) => ({
+                    title: deal.title,
+                    amount: deal.amount,
+                    closingDate: deal.closingDate,
+                    status: deal.status,
+                })),
+            },
+            metrics: {
+                daysSinceLastPurchase,
+                lastDealDate: lastDealDate ? lastDealDate.toISOString() : null,
+                currentDate: currentDate.toISOString(),
+            },
+        };
+        // Prompt especializado para el análisis
+        const prompt = `
+    Eres un asistente de ventas y análisis de clientes para un negocio. Analiza los siguientes datos de cliente y proporciona información comercial valiosa y procesable. NO repitas información básica como nombre, correo o teléfono que ya aparece en la interfaz.
+
+    DATOS DEL CLIENTE:
+    ${JSON.stringify(analysisData, null, 2)}
+
+    Genera un análisis CONCISO (máximo 3 puntos) con información de ALTO VALOR como:
+    
+    1. Patrones de compra: Identifica ciclos o temporalidad en las compras del cliente basado en los closingDate. ¿Compra mensualmente? ¿Trimestralmente?
+    
+    2. Próximo contacto: Han pasado ${daysSinceLastPurchase} días desde la última compra. Basándote en su patrón histórico de intervalos entre compras, calcula específicamente CUÁNDO sería el momento óptimo para contactarlos para una nueva venta (fecha aproximada).
+
+    
+    3. Valor promedio: Calcula el ticket promedio y si sus compras aumentan o disminuyen en valor.
+    
+    4. Proyección: Basado en el historial, predice específicamente cuándo sería probable su próxima compra (fecha) y por qué monto. Incluye el razonamiento detrás de esta predicción.
+
+    
+    5. Oportunidad: Identifica productos complementarios o servicios adicionales que podría necesitar basado en sus compras anteriores.
+    
+    6. Estatus de relación: Determina si es un cliente activo, en riesgo de abandono o inactivo basado en su frecuencia de compra.
+    
+    Formato de respuesta:
+    - Incluye SOLO información procesable y relevante para ventas.
+    - Sé específico con fechas y montos cuando sea posible.
+    - Si no hay suficientes datos para algún punto, NO lo inventes ni lo menciones.
+    - Responde en español.
+    - Responde en formato HTML.
+    - IMPORTANTE: Calcula con precisión los intervalos entre compras y usa esos datos para proyectar la fecha de la próxima compra.
+    - No incluyaas comillas dobles, comillas simples, etc. ni la palabra html
+    `;
+        const response = yield openai.chat.completions.create({
+            model: "gpt-4-turbo", // Recomiendo usar un modelo más avanzado para este análisis
+            messages: [
+                {
+                    role: "system",
+                    content: "Eres un asistente especializado en análisis de clientes y ventas que proporciona insights comerciales de alto valor.",
+                },
+                {
+                    role: "user",
+                    content: prompt,
+                },
+            ],
+            temperature: 0.2, // Temperatura baja para respuestas más precisas
+        });
+        return response.choices[0].message.content || "";
+    }
+    catch (error) {
+        console.log(error);
+        throw new Error("Failed to analyse contact");
+    }
+});
+exports.analyseContactDetails = analyseContactDetails;

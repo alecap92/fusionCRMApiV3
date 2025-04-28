@@ -54,5 +54,9 @@ const contactSchema = new mongoose_1.Schema({
         },
     ],
     files: [fileSchema],
+    leadScore: {
+        type: Number,
+        default: 0,
+    },
 });
 exports.default = (0, mongoose_1.model)("Contact", contactSchema);

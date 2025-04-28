@@ -17,8 +17,10 @@ const ContactModel_1 = __importDefault(require("../../models/ContactModel"));
 const DealsModel_1 = __importDefault(require("../../models/DealsModel"));
 // Obtener un solo contacto por ID
 const getContact = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a;
     try {
         const contactId = req.params.id;
+        const organizationId = (_a = req.user) === null || _a === void 0 ? void 0 : _a.organizationId;
         const contact = yield ContactModel_1.default.findById(contactId).populate("EmployeeOwner");
         if (!contact) {
             return res.status(404).json({ message: "Contacto no encontrado" });

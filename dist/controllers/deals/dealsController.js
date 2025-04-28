@@ -185,7 +185,7 @@ exports.getContactDeals = getContactDeals;
 const createDeal = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         console.log(req.body);
-        const { title, amount, closingDate, associatedContactId, status, pipeline, fields, products } = req.body;
+        const { title, amount, closingDate, associatedContactId, status, pipeline, fields, products, } = req.body;
         if (!title ||
             !amount ||
             !closingDate ||
@@ -197,6 +197,7 @@ const createDeal = (req, res) => __awaiter(void 0, void 0, void 0, function* () 
         if (!req.user) {
             return res.status(401).json({ message: "Usuario no autenticado" });
         }
+        console.log(req.body);
         // Crear el deal con los campos correctos
         const newDeal = yield DealsModel_1.default.create({
             title: title, // Mapea name a title
@@ -225,14 +226,14 @@ const createDeal = (req, res) => __awaiter(void 0, void 0, void 0, function* () 
                 return ({
                     organizationId: (_a = req.user) === null || _a === void 0 ? void 0 : _a.organizationId,
                     clientId: associatedContactId,
-                    productId: product.productId,
+                    productId: product.id,
                     variantId: product.variantId,
                     dealId: newDeal._id,
                     quantity: parseInt(product.quantity) || 1, // Convertir a número porque viene como string
                     priceAtAcquisition: parseFloat(product.priceAtAcquisition) || 0, // Convertir a número
                     acquisitionDate: new Date(closingDate),
                     status: "active",
-                    userId: (_b = req.user) === null || _b === void 0 ? void 0 : _b._id
+                    userId: (_b = req.user) === null || _b === void 0 ? void 0 : _b._id,
                 });
             });
             console.log(acquisitions);
@@ -349,12 +350,8 @@ exports.changeDealStatus = changeDealStatus;
 const editDeal = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const dealId = req.params.id;
-        const { deal, fields } = req.body;
-        if (!deal.title ||
-            !deal.amount ||
-            !deal.closingDate ||
-            !deal.pipeline ||
-            !deal.status) {
+        const deal = req.body;
+        if (!deal.title || !deal.amount || !deal.closingDate || !deal.status) {
             return res.status(400).json({ message: "Faltan campos obligatorios" });
         }
         const updatedDeal = yield DealsModel_1.default.findByIdAndUpdate(dealId, deal, {
@@ -363,13 +360,37 @@ const editDeal = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
         if (!updatedDeal) {
             return res.status(404).json({ message: "Trato no encontrado" });
         }
+        // Actualizar campos personalizados
         yield DealsFieldsValuesModel_1.default.deleteMany({ deal: dealId }).exec();
-        const dealFields = fields.map((field) => ({
+        const dealFields = deal.fields.map((field) => ({
             deal: dealId,
-            field: field.fieldId,
+            field: field.field,
             value: field.value,
         }));
         yield DealsFieldsValuesModel_1.default.insertMany(dealFields);
+        // Manejar actualización de productos
+        if (deal.dealProducts && deal.dealProducts.length > 0) {
+            // Eliminar productos anteriores asociados a este trato
+            yield ProductAcquisitionModel_1.default.deleteMany({ dealId }).exec();
+            // Crear nuevas adquisiciones de productos
+            const acquisitions = deal.dealProducts.map((product) => {
+                var _a, _b;
+                return ({
+                    organizationId: (_a = req.user) === null || _a === void 0 ? void 0 : _a.organizationId,
+                    clientId: deal.associatedContactId,
+                    productId: product.id,
+                    variantId: product.variantId || "",
+                    dealId: dealId,
+                    quantity: parseInt(product.quantity) || 1,
+                    priceAtAcquisition: parseFloat(product.priceAtAcquisition) || 0,
+                    acquisitionDate: new Date(deal.closingDate),
+                    status: "active",
+                    userId: (_b = req.user) === null || _b === void 0 ? void 0 : _b._id,
+                });
+            });
+            // Insertar las nuevas adquisiciones
+            yield ProductAcquisitionModel_1.default.insertMany(acquisitions);
+        }
         return res.status(200).json({ message: "Deal updated" });
     }
     catch (error) {

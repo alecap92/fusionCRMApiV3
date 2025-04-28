@@ -47,7 +47,6 @@ const getQuotations = (req, res) => __awaiter(void 0, void 0, void 0, function* 
         const limit = parseInt(req.query.limit) || 10;
         const page = parseInt(req.query.page) || 1;
         const skip = (page - 1) * limit;
-        console.log(organizationId);
         const quotations = yield QuotationModel_1.default.find({ organizationId })
             .sort({ creationDate: -1, quotationNumber: -1 })
             .populate("contactId")
@@ -91,10 +90,14 @@ const searchQuotation = (req, res) => __awaiter(void 0, void 0, void 0, function
     try {
         const { term } = req.query;
         const organizationId = (_a = req.user) === null || _a === void 0 ? void 0 : _a.organizationId;
-        const quotations = yield QuotationModel_1.default.find({
-            name: { $regex: term, $options: "i" },
+        if (!term) {
+            return res.status(400).json({ message: "Term is required" });
+        }
+        const query = {
+            $or: [{ contactId: term }, { name: { $regex: term, $options: "i" } }],
             organizationId,
-        })
+        };
+        const quotations = yield QuotationModel_1.default.find(query)
             .populate("contactId")
             .sort({ creationDate: -1 });
         if (!quotations) {
@@ -115,6 +118,7 @@ const searchQuotation = (req, res) => __awaiter(void 0, void 0, void 0, function
                     lastName,
                     email,
                     mobile,
+                    id: contact._id,
                 } });
         });
         res.status(200).json({
@@ -158,7 +162,6 @@ const createQuotation = (req, res) => __awaiter(void 0, void 0, void 0, function
             const number = yield OrganizationModel_1.default.findByIdAndUpdate(organizationId, {
                 $inc: { "settings.quotations.quotationNumber": 1 },
             });
-            console.log(number);
         }
         res.status(201).json(newQuotation);
     }
@@ -213,9 +216,10 @@ const printQuotation = (req, res) => __awaiter(void 0, void 0, void 0, function*
     try {
         const { id } = req.params;
         const organizationId = (_a = req.user) === null || _a === void 0 ? void 0 : _a.organizationId;
-        console.log(id, organizationId);
         if (!organizationId) {
-            return res.status(400).json({ message: "ID de organización no proporcionado" });
+            return res
+                .status(400)
+                .json({ message: "ID de organización no proporcionado" });
         }
         // Utilizar el servicio para generar el PDF
         const { pdfBuffer } = yield (0, printQuotationService_1.generateQuotationPdf)(id, organizationId.toString());
@@ -228,7 +232,7 @@ const printQuotation = (req, res) => __awaiter(void 0, void 0, void 0, function*
         console.error("Error generando la cotización en PDF:", error);
         res.status(500).json({
             message: "Error generando la cotización en PDF",
-            error: error instanceof Error ? error.message : "Error desconocido"
+            error: error instanceof Error ? error.message : "Error desconocido",
         });
     }
 });
@@ -240,7 +244,7 @@ const sendQuotationEmail = (req, res) => __awaiter(void 0, void 0, void 0, funct
         const organizationId = (_a = req.user) === null || _a === void 0 ? void 0 : _a.organizationId;
         const emailConfig = yield IntegrationsModel_1.default.findOne({
             organizationId,
-            service: "brevo"
+            service: "brevo",
         });
         if (!emailConfig) {
             return res.status(400).json({ message: "Email configuration not found" });
@@ -248,19 +252,21 @@ const sendQuotationEmail = (req, res) => __awaiter(void 0, void 0, void 0, funct
         const config = emailConfig.credentials;
         const apiKey = config.apiKey;
         if (!quotationNumber || !to || !subject || !organizationId) {
-            return res.status(400).json({ message: "Faltan datos requeridos para enviar el correo" });
+            return res
+                .status(400)
+                .json({ message: "Faltan datos requeridos para enviar el correo" });
         }
         // Utilizar el servicio para generar el PDF
         const { pdfBuffer } = yield (0, printQuotationService_1.generateQuotationPdf)(quotationNumber, organizationId.toString());
         // Convertir el PDF a base64
         const pdfBase64 = (0, printQuotationService_1.getPdfAsBase64)(pdfBuffer);
         // Importar el servicio de Brevo
-        const { sendEmailWithBrevo } = require('../../services/email/brevoEmailService');
+        const { sendEmailWithBrevo, } = require("../../services/email/brevoEmailService");
         // Crear el HTML para el cuerpo del correo (solo se usará si no hay templateId)
         const emailHtml = `
       <div style="font-family: Arial, sans-serif; line-height: 1.6;">
         <h2>Cotización #${quotationNumber}</h2>
-        <p>${message || 'Adjunto encontrará la cotización solicitada.'}</p>
+        <p>${message || "Adjunto encontrará la cotización solicitada."}</p>
         <p>Saludos cordiales,<br>Equipo de ventas</p>
       </div>
     `;
@@ -274,11 +280,11 @@ const sendQuotationEmail = (req, res) => __awaiter(void 0, void 0, void 0, funct
                 {
                     content: pdfBase64,
                     name: (0, printQuotationService_1.getQuotationPdfFilename)(quotationNumber),
-                    contentType: 'application/pdf'
-                }
+                    contentType: "application/pdf",
+                },
             ],
             organizationId: organizationId.toString(),
-            api_key: apiKey || ''
+            api_key: apiKey || "",
         };
         // Si hay templateId, añadirlo a los parámetros
         if (templateId) {
@@ -289,10 +295,10 @@ const sendQuotationEmail = (req, res) => __awaiter(void 0, void 0, void 0, funct
         res.status(200).json({ message: "Cotización enviada correctamente" });
     }
     catch (error) {
-        console.error('Error al enviar cotización por correo:', error);
+        console.error("Error al enviar cotización por correo:", error);
         res.status(500).json({
             message: "Error enviando el correo de la cotización",
-            error: error instanceof Error ? error.message : "Error desconocido"
+            error: error instanceof Error ? error.message : "Error desconocido",
         });
     }
 });

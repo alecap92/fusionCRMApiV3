@@ -1,37 +1,4 @@
 "use strict";
-var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    var desc = Object.getOwnPropertyDescriptor(m, k);
-    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
-      desc = { enumerable: true, get: function() { return m[k]; } };
-    }
-    Object.defineProperty(o, k2, desc);
-}) : (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    o[k2] = m[k];
-}));
-var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
-    Object.defineProperty(o, "default", { enumerable: true, value: v });
-}) : function(o, v) {
-    o["default"] = v;
-});
-var __importStar = (this && this.__importStar) || (function () {
-    var ownKeys = function(o) {
-        ownKeys = Object.getOwnPropertyNames || function (o) {
-            var ar = [];
-            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
-            return ar;
-        };
-        return ownKeys(o);
-    };
-    return function (mod) {
-        if (mod && mod.__esModule) return mod;
-        var result = {};
-        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
-        __setModuleDefault(result, mod);
-        return result;
-    };
-})();
 var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
     function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
     return new (P || (P = Promise))(function (resolve, reject) {
@@ -58,16 +25,7 @@ const imapClient_1 = require("./utils/imapClient");
 // Inicialización de servicios
 const initializeServices = () => __awaiter(void 0, void 0, void 0, function* () {
     yield (0, db_1.connect)();
-    // Inicializar el cliente IMAP para emails
     (0, imapClient_1.listenForNewEmails)();
-    // Inicializar el servicio de colas para automatizaciones
-    try {
-        const { queueService } = yield Promise.resolve().then(() => __importStar(require('./services/queue/queueService')));
-        console.log('✅ Servicio de colas inicializado correctamente');
-    }
-    catch (error) {
-        console.error('❌ Error al inicializar el servicio de colas:', error);
-    }
 });
 // Configuración de middleware
 const configureMiddleware = (app) => {
@@ -143,6 +101,10 @@ const configureRoutes = (app) => {
             path: "/api/v1/product-acquisitions",
             router: routes_1.default.productAcquisitionRouter,
         },
+        {
+            path: "/api/v1/scoring-rules",
+            router: routes_1.default.scoringRulesRouter,
+        },
     ];
     // Rutas especiales (con o sin autenticación)
     const specialRoutes = [
@@ -212,40 +174,7 @@ const startServer = () => __awaiter(void 0, void 0, void 0, function* () {
 });
 // Iniciar la aplicación
 if (require.main === module) {
-    let serverInstance = null;
-    // Capturar señales de terminación para cerrar limpiamente
-    const handleShutdown = (signal) => __awaiter(void 0, void 0, void 0, function* () {
-        console.log(`Recibida señal ${signal}, cerrando aplicación...`);
-        // Cerrar el servicio de colas si está inicializado
-        try {
-            const { queueService } = yield Promise.resolve().then(() => __importStar(require('./services/queue/queueService')));
-            yield queueService.close();
-            console.log('✅ Servicio de colas cerrado correctamente');
-        }
-        catch (error) {
-            console.error('❌ Error al cerrar el servicio de colas:', error);
-        }
-        // Cerrar el servidor HTTP si está inicializado
-        if (serverInstance && serverInstance.server) {
-            console.log('Cerrando conexiones HTTP...');
-            serverInstance.server.close(() => {
-                console.log('Servidor HTTP cerrado correctamente');
-                process.exit(0);
-            });
-        }
-        else {
-            process.exit(0);
-        }
-    });
-    // Registrar manejadores para señales de terminación
-    process.on('SIGINT', () => handleShutdown('SIGINT'));
-    process.on('SIGTERM', () => handleShutdown('SIGTERM'));
-    // Iniciar el servidor
-    startServer()
-        .then((instance) => {
-        serverInstance = instance;
-    })
-        .catch((error) => {
+    startServer().catch((error) => {
         console.error("Error fatal al iniciar la aplicación:", error instanceof Error ? error.message : "Error desconocido");
         process.exit(1);
     });

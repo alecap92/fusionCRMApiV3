@@ -17,6 +17,7 @@ const xlsx_1 = __importDefault(require("xlsx"));
 const ContactModel_1 = __importDefault(require("../../models/ContactModel"));
 const importContacts = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     var _a, _b;
+    console.log(req.user);
     const userId = (_a = req.user) === null || _a === void 0 ? void 0 : _a._id;
     const organizationId = (_b = req.user) === null || _b === void 0 ? void 0 : _b.organizationId;
     const mapping = req.body.mapping ? JSON.parse(req.body.mapping) : null;
@@ -46,7 +47,11 @@ const importContacts = (req, res) => __awaiter(void 0, void 0, void 0, function*
                 .json({ message: "El archivo no contiene suficientes datos" });
         }
         const headers = data[0];
-        const contacts = data.slice(1).map((row) => {
+        const contactsToImport = [];
+        const duplicates = [];
+        const processed = [];
+        // Procesar cada fila
+        for (const row of data.slice(1)) {
             const properties = headers
                 .map((header, index) => {
                 const mappedKey = mapping[header];
@@ -76,22 +81,70 @@ const importContacts = (req, res) => __awaiter(void 0, void 0, void 0, function*
                 };
             })
                 .filter((property) => property !== null);
-            return {
-                properties,
-                EmployeeOwner: [userId],
-                source: "imported",
-                organizationId,
-            };
-        });
-        // Procesar en lotes
-        const batchSize = 1000;
-        for (let i = 0; i < contacts.length; i += batchSize) {
-            const batch = contacts.slice(i, i + batchSize);
-            yield ContactModel_1.default.insertMany(batch);
+            // Extraer email y mobile para la verificación de duplicados
+            let email = "";
+            let mobile = "";
+            for (const prop of properties) {
+                if (prop.key === "email") {
+                    email = prop.value;
+                }
+                else if (prop.key === "mobile" || prop.key === "cellphone") {
+                    mobile = prop.value;
+                }
+            }
+            // Verificar si el contacto ya existe (por email o mobile)
+            let existingContact = null;
+            if (email && typeof email === "string" && email.trim() !== "") {
+                existingContact = yield ContactModel_1.default.findOne({
+                    organizationId,
+                    "properties.key": "email",
+                    "properties.value": email,
+                });
+            }
+            if (!existingContact &&
+                mobile &&
+                typeof mobile === "string" &&
+                mobile.trim() !== "") {
+                existingContact = yield ContactModel_1.default.findOne({
+                    organizationId,
+                    $or: [
+                        { "properties.key": "mobile", "properties.value": mobile },
+                        { "properties.key": "cellphone", "properties.value": mobile },
+                    ],
+                });
+            }
+            if (existingContact) {
+                duplicates.push({
+                    id: existingContact._id.toString(),
+                    properties: existingContact.properties,
+                });
+            }
+            else {
+                const newContact = {
+                    properties,
+                    EmployeeOwner: [userId],
+                    source: "imported",
+                    organizationId,
+                };
+                contactsToImport.push(newContact);
+                processed.push(row);
+            }
+        }
+        // Procesar en lotes solo los contactos nuevos
+        let importedCount = 0;
+        if (contactsToImport.length > 0) {
+            const batchSize = 1000;
+            for (let i = 0; i < contactsToImport.length; i += batchSize) {
+                const batch = contactsToImport.slice(i, i + batchSize);
+                yield ContactModel_1.default.insertMany(batch);
+            }
+            importedCount = contactsToImport.length;
         }
         res.status(201).json({
             message: "Contactos importados exitosamente",
-            importedCount: contacts.length,
+            importedCount: importedCount,
+            duplicatesCount: duplicates.length,
+            totalProcessed: processed.length,
         });
     }
     catch (error) {

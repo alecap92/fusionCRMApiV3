@@ -50,6 +50,7 @@ const productRouter_2 = __importDefault(require("./productRouter"));
 const productAcquisitionRouter_1 = __importDefault(require("./productAcquisitionRouter"));
 const documentRouter_1 = __importDefault(require("./documentRouter"));
 const contactFilesRouter_1 = __importDefault(require("./contactFilesRouter"));
+const scoringRulesRouter_1 = __importDefault(require("./scoringRulesRouter"));
 const routes = {
     authRouter: authRouter_1.default,
     downloadDealsRouter: downloadDealsRouter_1.default,
@@ -97,6 +98,7 @@ const routes = {
     productVariantRouter: productRouter_2.default,
     productAcquisitionRouter: productAcquisitionRouter_1.default,
     documentRouter: documentRouter_1.default,
-    contactFilesRouter: contactFilesRouter_1.default
+    contactFilesRouter: contactFilesRouter_1.default,
+    scoringRulesRouter: scoringRulesRouter_1.default,
 };
 exports.default = routes;
