@@ -9,6 +9,7 @@ import {
   filterContacts,
 } from "../controllers/contacts/contactsController";
 import { advancedFilterContacts } from "../controllers/contacts/advancedFilter";
+import { analyseContact } from "../controllers/contacts/aiAnalyser";
 
 const router: Router = Router();
 
@@ -18,6 +19,7 @@ router.post("/filter", filterContacts);
 router.post("/", createContact);
 router.post("/advanced-filter", advancedFilterContacts);
 router.delete("/", deleteContact);
+router.get("/analyse/:id", analyseContact);
 router.put("/:id", updateContact);
 router.get("/:id", getContact);
 
