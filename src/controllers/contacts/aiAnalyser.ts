@@ -6,6 +6,7 @@ import ActivityModel from "../../models/ActivityModel";
 
 export const analyseContact = async (req: Request, res: Response) => {
   try {
+    console.log("analiseContact");
     const organizationId = req.user?.organizationId;
     const contactId = req.params.id;
 
