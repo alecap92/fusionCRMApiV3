@@ -10,8 +10,6 @@ export const analyseContact = async (req: Request, res: Response) => {
     const organizationId = req.user?.organizationId;
     const contactId = req.params.id;
 
-    console.log(organizationId, contactId);
-
     if (!organizationId) {
       return res.status(401).json({
         message: "No se proporcionó un ID de organización",
