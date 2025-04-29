@@ -106,6 +106,10 @@ const configureRoutes = (app: Application): void => {
       path: "/api/v1/scoring-rules",
       router: routes.scoringRulesRouter,
     },
+    {
+      path: "/api/v1/analytics",
+      router: routes.analyticsRouter,
+    },
   ];
 
   // Rutas especiales (con o sin autenticación)

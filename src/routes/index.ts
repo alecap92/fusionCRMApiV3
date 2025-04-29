@@ -46,6 +46,7 @@ import productAcquisitionRouter from "./productAcquisitionRouter";
 import documentRouter from "./documentRouter";
 import contactFilesRouter from "./contactFilesRouter";
 import scoringRulesRouter from "./scoringRulesRouter";
+import analyticsRouter from "./analyticsRouter";
 
 const routes = {
   authRouter,
@@ -96,6 +97,7 @@ const routes = {
   documentRouter,
   contactFilesRouter,
   scoringRulesRouter,
+  analyticsRouter,
 };
 
 export default routes;
