@@ -47,6 +47,7 @@ import documentRouter from "./documentRouter";
 import contactFilesRouter from "./contactFilesRouter";
 import scoringRulesRouter from "./scoringRulesRouter";
 import analyticsRouter from "./analyticsRouter";
+import strategyRouter from "./strategyRouter";
 
 const routes = {
   authRouter,
@@ -98,6 +99,7 @@ const routes = {
   contactFilesRouter,
   scoringRulesRouter,
   analyticsRouter,
+  strategyRouter,
 };
 
 export default routes;

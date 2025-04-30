@@ -208,6 +208,8 @@ export const analyseContactDetails = async (
     5. Oportunidad: Identifica productos complementarios o servicios adicionales que podría necesitar basado en sus compras anteriores.
     
     6. Estatus de relación: Determina si es un cliente activo, en riesgo de abandono o inactivo basado en su frecuencia de compra.
+
+    7. Calcula el Lifetime Value (LTV) del cliente del ultimo año, en caso que falte informacion, usa el año anterior y calcula el promedio de este año. CAMPO IMPORTANTE.
     
     Formato de respuesta:
     - Incluye SOLO información procesable y relevante para ventas.
@@ -216,7 +218,7 @@ export const analyseContactDetails = async (
     - Responde en español.
     - Responde en formato HTML.
     - IMPORTANTE: Calcula con precisión los intervalos entre compras y usa esos datos para proyectar la fecha de la próxima compra.
-    - No incluyaas comillas dobles, comillas simples, etc. ni la palabra html
+    - No incluyas comillas dobles, comillas simples, etc. ni la palabra html
     `;
 
     const response = await openai.chat.completions.create({

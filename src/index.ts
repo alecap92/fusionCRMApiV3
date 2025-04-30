@@ -110,6 +110,10 @@ const configureRoutes = (app: Application): void => {
       path: "/api/v1/analytics",
       router: routes.analyticsRouter,
     },
+    {
+      path: "/api/v1/strategies",
+      router: routes.strategyRouter,
+    },
   ];
 
   // Rutas especiales (con o sin autenticación)
