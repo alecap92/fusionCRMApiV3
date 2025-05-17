@@ -20,56 +20,56 @@ interface ProductAcquisition extends Document {
 }
 
 const productAcquisitionSchema = new Schema<ProductAcquisition>({
-  organizationId: { 
-    type: Schema.Types.ObjectId, 
-    ref: 'Organization',
-    required: true 
+  organizationId: {
+    type: Schema.Types.ObjectId,
+    ref: "Organization",
+    required: true,
   },
-  clientId: { 
-    type: Schema.Types.ObjectId, 
-    ref: 'Contact',
-    required: true 
+  clientId: {
+    type: Schema.Types.ObjectId,
+    ref: "Contact",
+    required: true,
   },
-  productId: { 
-    type: Schema.Types.ObjectId, 
-    ref: 'Product',
-    required: true 
+  productId: {
+    type: Schema.Types.ObjectId,
+    ref: "Product",
+    required: true,
   },
   variantId: {
     type: Schema.Types.Mixed,
-    ref: 'ProductVariant',
-    default: ""
+    ref: "ProductVariant",
+    default: undefined,
   },
-  dealId: { 
-    type: Schema.Types.ObjectId, 
-    ref: 'Deal'
+  dealId: {
+    type: Schema.Types.ObjectId,
+    ref: "Deal",
   },
-  quotationId: { 
-    type: Schema.Types.ObjectId, 
-    ref: 'Quotation'
+  quotationId: {
+    type: Schema.Types.ObjectId,
+    ref: "Quotation",
   },
-  invoiceId: { 
-    type: Schema.Types.ObjectId, 
-    ref: 'Invoice'
+  invoiceId: {
+    type: Schema.Types.ObjectId,
+    ref: "Invoice",
   },
   quantity: { type: Number, required: true, min: 1 },
   priceAtAcquisition: { type: Number, required: true, min: 0 },
   acquisitionDate: { type: Date, required: true },
-  status: { 
-    type: String, 
+  status: {
+    type: String,
     required: true,
     enum: ["active", "cancelled", "returned", "pending", "completed"],
-    default: "active"
+    default: "active",
   },
   notes: { type: String },
   tags: [{ type: String }],
-  userId: { 
-    type: Schema.Types.ObjectId, 
-    ref: 'User',
-    required: true 
+  userId: {
+    type: Schema.Types.ObjectId,
+    ref: "User",
+    required: true,
   },
   createdAt: { type: Date, default: Date.now },
-  updatedAt: { type: Date, default: Date.now }
+  updatedAt: { type: Date, default: Date.now },
 });
 
 // Índices para mejorar el rendimiento de las consultas
@@ -78,6 +78,9 @@ productAcquisitionSchema.index({ organizationId: 1, productId: 1 });
 productAcquisitionSchema.index({ organizationId: 1, status: 1 });
 productAcquisitionSchema.index({ organizationId: 1, acquisitionDate: 1 });
 
-const ProductAcquisitionModel = mongoose.model<ProductAcquisition>("ProductAcquisition", productAcquisitionSchema);
+const ProductAcquisitionModel = mongoose.model<ProductAcquisition>(
+  "ProductAcquisition",
+  productAcquisitionSchema
+);
 
-export default ProductAcquisitionModel; 
+export default ProductAcquisitionModel;

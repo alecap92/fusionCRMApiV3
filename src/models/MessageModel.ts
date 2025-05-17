@@ -24,6 +24,7 @@ interface IMessage extends Document {
   replyToMessage?: string;
   messageId?: string;
   reactions?: IReaction[];
+  conversation: Schema.Types.ObjectId;
 }
 
 const reactionSchema = new Schema<IReaction>({
@@ -58,6 +59,11 @@ const messageSchema = new Schema<IMessage>({
   },
   messageId: { type: String },
   reactions: [reactionSchema],
+  conversation: {
+    type: Schema.Types.ObjectId,
+    ref: "Conversation",
+    required: true,
+  },
 });
 
 export default model<IMessage>("Message", messageSchema);

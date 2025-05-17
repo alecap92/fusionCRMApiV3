@@ -48,6 +48,7 @@ import contactFilesRouter from "./contactFilesRouter";
 import scoringRulesRouter from "./scoringRulesRouter";
 import analyticsRouter from "./analyticsRouter";
 import strategyRouter from "./strategyRouter";
+import conversationRouter from "./conversation.routes";
 
 const routes = {
   authRouter,
@@ -100,6 +101,7 @@ const routes = {
   scoringRulesRouter,
   analyticsRouter,
   strategyRouter,
+  conversationRouter,
 };
 
 export default routes;

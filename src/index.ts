@@ -140,6 +140,10 @@ const configureRoutes = (app: Application): void => {
       path: "/api/v1/contact-files",
       router: routes.contactFilesRouter,
     },
+    {
+      path: "/api/v1/conversation",
+      router: routes.conversationRouter,
+    },
   ];
 
   // Registrar rutas protegidas

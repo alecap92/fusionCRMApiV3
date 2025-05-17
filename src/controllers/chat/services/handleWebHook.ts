@@ -4,12 +4,16 @@ import MessageModel from "../../../models/MessageModel";
 import { getMedia } from "./getMedia";
 import { emitNewNotification } from "../../notifications/notificationController";
 import { subirArchivo } from "../../../config/aws";
-import {Expo} from 'expo-server-sdk';
+import { Expo } from "expo-server-sdk";
 import { sendNotification } from "./pushNotificationService";
+import IntegrationsModel from "../../../models/IntegrationsModel";
+import ConversationModel from "../../../models/ConversationModel";
+import ConversationPipelineModel from "../../../models/ConversationPipelineModel";
 
-
-
-export const handleWebhook = async (req: Request, res: Response): Promise<void> => {
+export const handleWebhook = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
   try {
     const body = req.body;
 
@@ -35,9 +39,12 @@ export const handleWebhook = async (req: Request, res: Response): Promise<void> 
           continue;
         }
 
-        const organization = await OrganizationModel.findOne({
-          "settings.whatsapp.phoneNumber": to,
+        const integration = await IntegrationsModel.findOne({
+          service: "whatsapp",
+          "credentials.phoneNumber": to,
         });
+
+        const organization = integration?.organizationId;
 
         if (!organization) {
           console.error(`Organization with WhatsApp number ${to} not found.`);
@@ -45,8 +52,13 @@ export const handleWebhook = async (req: Request, res: Response): Promise<void> 
           return;
         }
 
-        const accessToken = organization.settings.whatsapp.accessToken as string;
-        const systemUserId = organization.employees[0];
+        const accessToken = integration?.credentials.accessToken as string;
+
+        const org = await OrganizationModel.findOne({
+          _id: organization,
+        });
+
+        const systemUserId = org?.employees[0];
 
         if (!systemUserId) {
           console.error("No system user found.");
@@ -64,14 +76,20 @@ export const handleWebhook = async (req: Request, res: Response): Promise<void> 
 
         if (type === "text") {
           text = message.text.body;
-        } else if (["image", "document", "audio", "video", "sticker"].includes(type)) {
+        } else if (
+          ["image", "document", "audio", "video", "sticker"].includes(type)
+        ) {
           text = `${capitalizeFirstLetter(type)} recibido`;
 
           const mediaObject = message[type];
 
           if (mediaObject?.id) {
             const mediaBuffer = await getMedia(mediaObject.id, accessToken);
-            awsUrl = await subirArchivo(mediaBuffer, mediaObject.id, mediaObject.mime_type);
+            awsUrl = await subirArchivo(
+              mediaBuffer,
+              mediaObject.id,
+              mediaObject.mime_type
+            );
           }
         } else {
           text = "Otro tipo de mensaje recibido";
@@ -79,9 +97,59 @@ export const handleWebhook = async (req: Request, res: Response): Promise<void> 
 
         const repliedMessageId = message.context?.id;
         const originalMessage = repliedMessageId
-            ? await MessageModel.findOne({ messageId: repliedMessageId })
-            : null;
+          ? await MessageModel.findOne({ messageId: repliedMessageId })
+          : null;
 
+        const pipeline = await ConversationPipelineModel.findOne({
+          organization: organization,
+        });
+
+        if (!pipeline) {
+          console.error("No pipeline found");
+          res.status(500).send("Pipeline not found");
+          return;
+        }
+
+        let conversation = await ConversationModel.findOne({
+          "participants.contact.reference": from,
+        });
+
+        // Crear conversación si no existe
+        if (!conversation) {
+          conversation = await ConversationModel.create({
+            title: from,
+            organization: organization,
+            participants: {
+              user: {
+                type: "User",
+                reference: systemUserId,
+              },
+              contact: {
+                type: "Contact",
+                reference: from,
+              },
+            },
+            pipeline: pipeline?._id, // pipeline id
+            currentStage: 0,
+            assignedTo: systemUserId,
+            priority: "medium",
+            tags: ["servicio premium", "potencial cliente"],
+            leadScore: 65,
+            firstContactTimestamp: new Date(),
+            metadata: [
+              {
+                key: "origen",
+                value: "whatsapp",
+              },
+              {
+                key: "interés",
+                value: "consulta inicial",
+              },
+            ],
+          });
+        }
+
+        // Crear mensaje
         await MessageModel.create({
           user: systemUserId,
           organization: organization._id,
@@ -96,20 +164,18 @@ export const handleWebhook = async (req: Request, res: Response): Promise<void> 
           possibleName: value.contacts?.[0]?.profile?.name || "",
           replyToMessage: originalMessage?._id || null,
           messageId: message.id,
+          conversation: conversation._id,
         });
 
-
-        const toTokens = ["ExponentPushToken[I5cjWVDWDbnjGPUqFdP2dL]"]
-        try{
+        const toTokens = ["ExponentPushToken[I5cjWVDWDbnjGPUqFdP2dL]"];
+        try {
           await sendNotification(toTokens, {
             title: value.contacts?.[0]?.profile?.name || "",
-            body: text
+            body: text,
           });
-
-        }catch(error){
-          console.log(error, "Error sending push notification")
+        } catch (error) {
+          console.log(error, "Error sending push notification");
         }
-
 
         emitNewNotification("whatsapp", organization._id, 1, from, {
           message: text,
@@ -129,15 +195,22 @@ const capitalizeFirstLetter = (string: string): string => {
   return string.charAt(0).toUpperCase() + string.slice(1);
 };
 
-const handleReaction = async (message: any, timestamp: string): Promise<void> => {
+const handleReaction = async (
+  message: any,
+  timestamp: string
+): Promise<void> => {
   const { reaction } = message;
   const emoji = reaction.emoji;
   const messageIdReactedTo = reaction.message_id;
 
-  const originalMessage = await MessageModel.findOne({ messageId: messageIdReactedTo });
+  const originalMessage = await MessageModel.findOne({
+    messageId: messageIdReactedTo,
+  });
 
   if (!originalMessage) {
-    console.error(`Mensaje original con ID ${messageIdReactedTo} no encontrado.`);
+    console.error(
+      `Mensaje original con ID ${messageIdReactedTo} no encontrado.`
+    );
     return;
   }
 

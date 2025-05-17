@@ -205,7 +205,6 @@ export const createDeal = async (
   res: Response
 ): Promise<Response> => {
   try {
-    console.log(req.body);
     const {
       title,
       amount,
@@ -232,8 +231,6 @@ export const createDeal = async (
       return res.status(401).json({ message: "Usuario no autenticado" });
     }
 
-    console.log(req.body);
-
     // Crear el deal con los campos correctos
     const newDeal = await Deals.create({
       title: title, // Mapea name a title
@@ -258,13 +255,15 @@ export const createDeal = async (
       await DealsFieldsValues.insertMany(dealFields);
     }
 
+    console.log(products);
+
     // Procesar productos y crear adquisiciones
     if (products && products.length > 0) {
       const acquisitions = products.map((product: any) => ({
         organizationId: req.user?.organizationId,
         clientId: associatedContactId,
         productId: product.id,
-        variantId: product.variantId,
+        variantId: product.variantId || undefined,
         dealId: newDeal._id,
         quantity: parseInt(product.quantity) || 1, // Convertir a número porque viene como string
         priceAtAcquisition: parseFloat(product.priceAtAcquisition) || 0, // Convertir a número
@@ -272,8 +271,6 @@ export const createDeal = async (
         status: "active",
         userId: req.user?._id,
       }));
-
-      console.log(acquisitions);
 
       // Crear todas las adquisiciones en una sola operación
       await ProductAcquisitionModel.insertMany(acquisitions);
@@ -439,7 +436,7 @@ export const editDeal = async (
         organizationId: req.user?.organizationId,
         clientId: deal.associatedContactId,
         productId: product.id,
-        variantId: product.variantId || "",
+        variantId: product.variantId || undefined,
         dealId: dealId,
         quantity: parseInt(product.quantity) || 1,
         priceAtAcquisition: parseFloat(product.priceAtAcquisition) || 0,
@@ -481,7 +478,9 @@ export const deleteDeal = async (req: Request, res: Response) => {
       return res.status(400).json({ message: "Falta el id del trato" });
     }
 
-    const deal = await Deals.deleteOne({ _id: dealId }).exec();
+    await ProductAcquisitionModel.deleteMany({ dealId }).exec();
+
+    await Deals.deleteOne({ _id: dealId }).exec();
 
     return res.status(200).json({ message: "Deal deleted" });
   } catch (error) {

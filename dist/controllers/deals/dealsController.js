@@ -1,23 +1,61 @@
 "use strict";
-var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
-    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+var __awaiter =
+  (this && this.__awaiter) ||
+  function (thisArg, _arguments, P, generator) {
+    function adopt(value) {
+      return value instanceof P
+        ? value
+        : new P(function (resolve) {
+            resolve(value);
+          });
+    }
     return new (P || (P = Promise))(function (resolve, reject) {
-        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
-        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
-        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
-        step((generator = generator.apply(thisArg, _arguments || [])).next());
+      function fulfilled(value) {
+        try {
+          step(generator.next(value));
+        } catch (e) {
+          reject(e);
+        }
+      }
+      function rejected(value) {
+        try {
+          step(generator["throw"](value));
+        } catch (e) {
+          reject(e);
+        }
+      }
+      function step(result) {
+        result.done
+          ? resolve(result.value)
+          : adopt(result.value).then(fulfilled, rejected);
+      }
+      step((generator = generator.apply(thisArg, _arguments || [])).next());
     });
-};
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
+  };
+var __importDefault =
+  (this && this.__importDefault) ||
+  function (mod) {
+    return mod && mod.__esModule ? mod : { default: mod };
+  };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.deleteDeal = exports.editDeal = exports.changeDealStatus = exports.getDealDetails = exports.createDeal = exports.getContactDeals = exports.searchDeals = exports.getDeals = void 0;
-const DealsFieldsValuesModel_1 = __importDefault(require("../../models/DealsFieldsValuesModel"));
+exports.deleteDeal =
+  exports.editDeal =
+  exports.changeDealStatus =
+  exports.getDealDetails =
+  exports.createDeal =
+  exports.getContactDeals =
+  exports.searchDeals =
+  exports.getDeals =
+    void 0;
+const DealsFieldsValuesModel_1 = __importDefault(
+  require("../../models/DealsFieldsValuesModel")
+);
 const DealsModel_1 = __importDefault(require("../../models/DealsModel"));
 const date_fns_1 = require("date-fns");
 const automation_listener_1 = require("../../automation/automation.listener");
-const ProductAcquisitionModel_1 = __importDefault(require("../../models/ProductAcquisitionModel"));
+const ProductAcquisitionModel_1 = __importDefault(
+  require("../../models/ProductAcquisitionModel")
+);
 // Obtener tratos
 /**
  * Handles the retrieval of deals filtered by specified criteria.
@@ -31,10 +69,11 @@ const ProductAcquisitionModel_1 = __importDefault(require("../../models/ProductA
  *
  * @throws {Error} If there is any issue retrieving or processing data, responds with a status code 500 and an error message.
  */
-const getDeals = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+const getDeals = (req, res) =>
+  __awaiter(void 0, void 0, void 0, function* () {
     if (!req.user) {
-        res.status(401).json({ message: "Usuario no autenticado" });
-        return;
+      res.status(401).json({ message: "Usuario no autenticado" });
+      return;
     }
     const { organizationId } = req.user;
     const { pipelineId, name } = req.query;
@@ -42,79 +81,89 @@ const getDeals = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const startDate = filterDates ? filterDates.startDate : "";
     const endDate = filterDates ? filterDates.endDate : "";
     try {
-        let start, end;
-        if (!startDate || !endDate) {
-            const now = new Date();
-            start = (0, date_fns_1.subDays)(now, 30); // Últimos 30 días desde hoy
-            end = now;
-        }
-        else {
-            start = new Date(startDate);
-            end = new Date(endDate);
-        }
-        const query = {
-            organizationId,
-            pipeline: pipelineId,
-            closingDate: {
-                $gte: start,
-                $lte: end,
-            },
-        };
-        if (name) {
-            query.title = { $regex: name, $options: "i" };
-        }
-        const deals = yield DealsModel_1.default.find(query)
-            .populate("associatedContactId")
-            .populate("status")
-            .sort({ closingDate: -1 })
-            .exec();
-        const dealsFields = yield DealsFieldsValuesModel_1.default.find({
-            deal: { $in: deals.map((deal) => deal._id) },
+      let start, end;
+      if (!startDate || !endDate) {
+        const now = new Date();
+        start = (0, date_fns_1.subDays)(now, 30); // Últimos 30 días desde hoy
+        end = now;
+      } else {
+        start = new Date(startDate);
+        end = new Date(endDate);
+      }
+      const query = {
+        organizationId,
+        pipeline: pipelineId,
+        closingDate: {
+          $gte: start,
+          $lte: end,
+        },
+      };
+      if (name) {
+        query.title = { $regex: name, $options: "i" };
+      }
+      const deals = yield DealsModel_1.default
+        .find(query)
+        .populate("associatedContactId")
+        .populate("status")
+        .sort({ closingDate: -1 })
+        .exec();
+      const dealsFields = yield DealsFieldsValuesModel_1.default
+        .find({
+          deal: { $in: deals.map((deal) => deal._id) },
         })
-            .populate("field")
-            .exec();
-        const dealProducts = yield ProductAcquisitionModel_1.default.find({
-            dealId: { $in: deals.map((deal) => deal._id) },
+        .populate("field")
+        .exec();
+      const dealProducts = yield ProductAcquisitionModel_1.default
+        .find({
+          dealId: { $in: deals.map((deal) => deal._id) },
         })
-            .populate("productId")
-            .populate("variantId")
-            .exec();
-        const dealsToSend = deals.map((deal) => {
-            const fields = dealsFields.filter((field) => field.deal.toString() === deal._id.toString());
-            const dealProductsFiltered = dealProducts.filter((product) => product.dealId && product.dealId.toString() === deal._id.toString());
-            return Object.assign(Object.assign({}, deal.toObject()), { fields, dealProducts: dealProductsFiltered });
+        .populate("productId")
+        .populate("variantId")
+        .exec();
+      const dealsToSend = deals.map((deal) => {
+        const fields = dealsFields.filter(
+          (field) => field.deal.toString() === deal._id.toString()
+        );
+        const dealProductsFiltered = dealProducts.filter(
+          (product) =>
+            product.dealId && product.dealId.toString() === deal._id.toString()
+        );
+        return Object.assign(Object.assign({}, deal.toObject()), {
+          fields,
+          dealProducts: dealProductsFiltered,
         });
-        res.status(200).json(dealsToSend);
+      });
+      res.status(200).json(dealsToSend);
+    } catch (error) {
+      console.error("Error obteniendo los tratos:", error);
+      res.status(500).json({ message: "Error en el servidor" });
     }
-    catch (error) {
-        console.error("Error obteniendo los tratos:", error);
-        res.status(500).json({ message: "Error en el servidor" });
-    }
-});
+  });
 exports.getDeals = getDeals;
-const searchDeals = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+const searchDeals = (req, res) =>
+  __awaiter(void 0, void 0, void 0, function* () {
     if (!req.user) {
-        res.status(401).json({ message: "Usuario no autenticado" });
-        return;
+      res.status(401).json({ message: "Usuario no autenticado" });
+      return;
     }
     const { organizationId } = req.user;
     const { search } = req.query;
     try {
-        const deals = yield DealsModel_1.default.find({
-            organizationId,
-            title: { $regex: search, $options: "i" },
+      const deals = yield DealsModel_1.default
+        .find({
+          organizationId,
+          title: { $regex: search, $options: "i" },
         })
-            .populate("associatedContactId")
-            .populate("pipeline")
-            .populate("status")
-            .exec();
-        res.status(200).json(deals);
+        .populate("associatedContactId")
+        .populate("pipeline")
+        .populate("status")
+        .exec();
+      res.status(200).json(deals);
+    } catch (error) {
+      console.error("Error obteniendo los tratos:", error);
+      res.status(500).json({ message: "Error en el servidor" });
     }
-    catch (error) {
-        console.error("Error obteniendo los tratos:", error);
-        res.status(500).json({ message: "Error en el servidor" });
-    }
-});
+  });
 exports.searchDeals = searchDeals;
 /**
  * Asynchronous function that retrieves and returns a list of deals associated with a specific contact
@@ -131,41 +180,45 @@ exports.searchDeals = searchDeals;
  *                        information and request parameters such as the contact ID.
  * @param {Response} res - The response object used to send the results or error messages back to the client.
  */
-const getContactDeals = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+const getContactDeals = (req, res) =>
+  __awaiter(void 0, void 0, void 0, function* () {
     if (!req.user) {
-        res.status(401).json({ message: "Usuario no autenticado" });
-        return;
+      res.status(401).json({ message: "Usuario no autenticado" });
+      return;
     }
     const { organizationId } = req.user;
     const { id } = req.params;
     const limit = 100;
     try {
-        const deals = yield DealsModel_1.default.find({
-            organizationId,
-            associatedContactId: id,
+      const deals = yield DealsModel_1.default
+        .find({
+          organizationId,
+          associatedContactId: id,
         })
-            .populate("associatedContactId")
-            .populate("pipeline")
-            .populate("status")
-            .limit(limit)
-            .sort({ closingDate: -1 })
-            .exec();
-        const dealsFields = yield DealsFieldsValuesModel_1.default.find({
-            deal: { $in: deals.map((deal) => deal._id) },
+        .populate("associatedContactId")
+        .populate("pipeline")
+        .populate("status")
+        .limit(limit)
+        .sort({ closingDate: -1 })
+        .exec();
+      const dealsFields = yield DealsFieldsValuesModel_1.default
+        .find({
+          deal: { $in: deals.map((deal) => deal._id) },
         })
-            .populate("field")
-            .exec();
-        const dealsToSend = deals.map((deal) => {
-            const fields = dealsFields.filter((field) => field.deal.toString() === deal._id.toString());
-            return Object.assign(Object.assign({}, deal.toObject()), { fields });
-        });
-        res.status(200).json(dealsToSend);
+        .populate("field")
+        .exec();
+      const dealsToSend = deals.map((deal) => {
+        const fields = dealsFields.filter(
+          (field) => field.deal.toString() === deal._id.toString()
+        );
+        return Object.assign(Object.assign({}, deal.toObject()), { fields });
+      });
+      res.status(200).json(dealsToSend);
+    } catch (error) {
+      console.error("Error obteniendo los tratos:", error);
+      res.status(500).json({ message: "Error en el servidor" });
     }
-    catch (error) {
-        console.error("Error obteniendo los tratos:", error);
-        res.status(500).json({ message: "Error en el servidor" });
-    }
-});
+  });
 exports.getContactDeals = getContactDeals;
 // Crear trato
 // Crear trato
@@ -182,71 +235,84 @@ exports.getContactDeals = getContactDeals;
  *
  * @throws {Error} Throws an error if there is an issue while creating the deal or saving data to the database.
  */
-const createDeal = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+const createDeal = (req, res) =>
+  __awaiter(void 0, void 0, void 0, function* () {
     try {
-        console.log(req.body);
-        const { title, amount, closingDate, associatedContactId, status, pipeline, fields, products, } = req.body;
-        if (!title ||
-            !amount ||
-            !closingDate ||
-            !pipeline ||
-            !status ||
-            !associatedContactId) {
-            return res.status(400).json({ message: "Faltan campos obligatorios" });
-        }
-        if (!req.user) {
-            return res.status(401).json({ message: "Usuario no autenticado" });
-        }
-        console.log(req.body);
-        // Crear el deal con los campos correctos
-        const newDeal = yield DealsModel_1.default.create({
-            title: title, // Mapea name a title
-            amount: amount, // Mapea value a amount
-            closingDate: closingDate, // Mapea expectedCloseDate a closingDate
-            pipeline: pipeline,
-            status: status, // Mapea stage a status
-            associatedContactId: associatedContactId, // Usar contact.id
-            organizationId: req.user.organizationId,
-        });
-        // Procesar campos personalizados (esto está bien)
-        const dealFields = fields
-            .filter((field) => field.value !== "")
-            .map((field) => ({
-            deal: newDeal._id,
-            field: field.field,
-            value: field.value,
+      console.log(req.body);
+      const {
+        title,
+        amount,
+        closingDate,
+        associatedContactId,
+        status,
+        pipeline,
+        fields,
+        products,
+      } = req.body;
+      if (
+        !title ||
+        !amount ||
+        !closingDate ||
+        !pipeline ||
+        !status ||
+        !associatedContactId
+      ) {
+        return res.status(400).json({ message: "Faltan campos obligatorios" });
+      }
+      if (!req.user) {
+        return res.status(401).json({ message: "Usuario no autenticado" });
+      }
+      console.log(req.body);
+      // Crear el deal con los campos correctos
+      const newDeal = yield DealsModel_1.default.create({
+        title: title, // Mapea name a title
+        amount: amount, // Mapea value a amount
+        closingDate: closingDate, // Mapea expectedCloseDate a closingDate
+        pipeline: pipeline,
+        status: status, // Mapea stage a status
+        associatedContactId: associatedContactId, // Usar contact.id
+        organizationId: req.user.organizationId,
+      });
+      // Procesar campos personalizados (esto está bien)
+      const dealFields = fields
+        .filter((field) => field.value !== "")
+        .map((field) => ({
+          deal: newDeal._id,
+          field: field.field,
+          value: field.value,
         }));
-        if (dealFields.length > 0) {
-            yield DealsFieldsValuesModel_1.default.insertMany(dealFields);
-        }
-        // Procesar productos y crear adquisiciones
-        if (products && products.length > 0) {
-            const acquisitions = products.map((product) => {
-                var _a, _b;
-                return ({
-                    organizationId: (_a = req.user) === null || _a === void 0 ? void 0 : _a.organizationId,
-                    clientId: associatedContactId,
-                    productId: product.id,
-                    variantId: product.variantId,
-                    dealId: newDeal._id,
-                    quantity: parseInt(product.quantity) || 1, // Convertir a número porque viene como string
-                    priceAtAcquisition: parseFloat(product.priceAtAcquisition) || 0, // Convertir a número
-                    acquisitionDate: new Date(closingDate),
-                    status: "active",
-                    userId: (_b = req.user) === null || _b === void 0 ? void 0 : _b._id,
-                });
-            });
-            console.log(acquisitions);
-            // Crear todas las adquisiciones en una sola operación
-            yield ProductAcquisitionModel_1.default.insertMany(acquisitions);
-        }
-        return res.status(201).json({ message: "Deal created", deal: newDeal });
+      if (dealFields.length > 0) {
+        yield DealsFieldsValuesModel_1.default.insertMany(dealFields);
+      }
+      // Procesar productos y crear adquisiciones
+      if (products && products.length > 0) {
+        const acquisitions = products.map((product) => {
+          var _a, _b;
+          return {
+            organizationId:
+              (_a = req.user) === null || _a === void 0
+                ? void 0
+                : _a.organizationId,
+            clientId: associatedContactId,
+            productId: product.id,
+            variantId: product.variantId || undefined,
+            dealId: newDeal._id,
+            quantity: parseInt(product.quantity) || 1, // Convertir a número porque viene como string
+            priceAtAcquisition: parseFloat(product.priceAtAcquisition) || 0, // Convertir a número
+            acquisitionDate: new Date(closingDate),
+            status: "active",
+            userId: (_b = req.user) === null || _b === void 0 ? void 0 : _b._id,
+          };
+        });
+        // Crear todas las adquisiciones en una sola operación
+        yield ProductAcquisitionModel_1.default.insertMany(acquisitions);
+      }
+      return res.status(201).json({ message: "Deal created", deal: newDeal });
+    } catch (error) {
+      console.error("Error creando el trato:", error);
+      return res.status(500).json({ message: "Error en el servidor" });
     }
-    catch (error) {
-        console.error("Error creando el trato:", error);
-        return res.status(500).json({ message: "Error en el servidor" });
-    }
-});
+  });
 exports.createDeal = createDeal;
 // Obtener detalles del trato
 /**
@@ -261,32 +327,34 @@ exports.createDeal = createDeal;
  * @param {Response} res - The HTTP response object used to send back the result or error response.
  * @returns {Promise<Response>} - A Promise that resolves to an HTTP response containing the deal details and associated fields, or an error message in case of failure.
  */
-const getDealDetails = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+const getDealDetails = (req, res) =>
+  __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const dealId = req.params.id;
-        console.log(dealId, 1);
-        const deal = yield DealsModel_1.default.findOne({ _id: dealId })
-            .populate("associatedContactId")
-            .populate("pipeline")
-            .populate("organizationId")
-            .populate("status")
-            .exec();
-        if (!deal) {
-            return res.status(404).json({ message: "Trato no encontrado" });
-        }
-        const fields = yield DealsFieldsValuesModel_1.default.find({ deal: dealId })
-            .populate("field")
-            .exec();
-        return res.status(200).json({
-            deal,
-            fields,
-        });
+      const dealId = req.params.id;
+      console.log(dealId, 1);
+      const deal = yield DealsModel_1.default
+        .findOne({ _id: dealId })
+        .populate("associatedContactId")
+        .populate("pipeline")
+        .populate("organizationId")
+        .populate("status")
+        .exec();
+      if (!deal) {
+        return res.status(404).json({ message: "Trato no encontrado" });
+      }
+      const fields = yield DealsFieldsValuesModel_1.default
+        .find({ deal: dealId })
+        .populate("field")
+        .exec();
+      return res.status(200).json({
+        deal,
+        fields,
+      });
+    } catch (error) {
+      console.error("Error obteniendo los detalles del trato:", error);
+      return res.status(500).json({ message: "Error en el servidor" });
     }
-    catch (error) {
-        console.error("Error obteniendo los detalles del trato:", error);
-        return res.status(500).json({ message: "Error en el servidor" });
-    }
-});
+  });
 exports.getDealDetails = getDealDetails;
 // Cambiar el estado del trato con drag
 /**
@@ -303,33 +371,35 @@ exports.getDealDetails = getDealDetails;
  * @param {Response} res - The HTTP response object used to send the status and data back to the client.
  * @throws Will handle exceptions occurring during the database operation, logging the error and responding with a server error status.
  */
-const changeDealStatus = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+const changeDealStatus = (req, res) =>
+  __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const dealId = req.params.id;
-        const { status } = req.body;
-        const dealAntes = yield DealsModel_1.default.findById(dealId).exec();
-        if (!dealAntes) {
-            return res.status(404).json({ message: "Trato no encontrado" });
-        }
-        const deal = yield DealsModel_1.default.findByIdAndUpdate(dealId, { status }, { new: true }).exec();
-        // Emitir evento solo si el estado cambió
-        if (deal && dealAntes.status !== status) {
-            automation_listener_1.eventEmitter.emit("deals.status_changed", {
-                dealId,
-                fromStatus: dealAntes.status,
-                toStatus: status,
-                status, // estado actual
-                contact: dealAntes, // asumiendo que tiene el email/whatsapp
-                deal: dealAntes.toObject(),
-            });
-        }
-        return res.status(200).json(deal);
+      const dealId = req.params.id;
+      const { status } = req.body;
+      const dealAntes = yield DealsModel_1.default.findById(dealId).exec();
+      if (!dealAntes) {
+        return res.status(404).json({ message: "Trato no encontrado" });
+      }
+      const deal = yield DealsModel_1.default
+        .findByIdAndUpdate(dealId, { status }, { new: true })
+        .exec();
+      // Emitir evento solo si el estado cambió
+      if (deal && dealAntes.status !== status) {
+        automation_listener_1.eventEmitter.emit("deals.status_changed", {
+          dealId,
+          fromStatus: dealAntes.status,
+          toStatus: status,
+          status, // estado actual
+          contact: dealAntes, // asumiendo que tiene el email/whatsapp
+          deal: dealAntes.toObject(),
+        });
+      }
+      return res.status(200).json(deal);
+    } catch (error) {
+      console.error("Error cambiando el estado del trato:", error);
+      res.status(500).json({ message: "Error en el servidor" });
     }
-    catch (error) {
-        console.error("Error cambiando el estado del trato:", error);
-        res.status(500).json({ message: "Error en el servidor" });
-    }
-});
+  });
 exports.changeDealStatus = changeDealStatus;
 // Editar trato
 /**
@@ -347,57 +417,64 @@ exports.changeDealStatus = changeDealStatus;
  * @param {Response} res - The HTTP response object used to send the status and response message.
  * @returns {Promise<Response>} A promise that resolves to the HTTP response with the status and message.
  */
-const editDeal = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+const editDeal = (req, res) =>
+  __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const dealId = req.params.id;
-        const deal = req.body;
-        if (!deal.title || !deal.amount || !deal.closingDate || !deal.status) {
-            return res.status(400).json({ message: "Faltan campos obligatorios" });
-        }
-        const updatedDeal = yield DealsModel_1.default.findByIdAndUpdate(dealId, deal, {
-            new: true,
-        }).exec();
-        if (!updatedDeal) {
-            return res.status(404).json({ message: "Trato no encontrado" });
-        }
-        // Actualizar campos personalizados
-        yield DealsFieldsValuesModel_1.default.deleteMany({ deal: dealId }).exec();
-        const dealFields = deal.fields.map((field) => ({
-            deal: dealId,
-            field: field.field,
-            value: field.value,
-        }));
-        yield DealsFieldsValuesModel_1.default.insertMany(dealFields);
-        // Manejar actualización de productos
-        if (deal.dealProducts && deal.dealProducts.length > 0) {
-            // Eliminar productos anteriores asociados a este trato
-            yield ProductAcquisitionModel_1.default.deleteMany({ dealId }).exec();
-            // Crear nuevas adquisiciones de productos
-            const acquisitions = deal.dealProducts.map((product) => {
-                var _a, _b;
-                return ({
-                    organizationId: (_a = req.user) === null || _a === void 0 ? void 0 : _a.organizationId,
-                    clientId: deal.associatedContactId,
-                    productId: product.id,
-                    variantId: product.variantId || "",
-                    dealId: dealId,
-                    quantity: parseInt(product.quantity) || 1,
-                    priceAtAcquisition: parseFloat(product.priceAtAcquisition) || 0,
-                    acquisitionDate: new Date(deal.closingDate),
-                    status: "active",
-                    userId: (_b = req.user) === null || _b === void 0 ? void 0 : _b._id,
-                });
-            });
-            // Insertar las nuevas adquisiciones
-            yield ProductAcquisitionModel_1.default.insertMany(acquisitions);
-        }
-        return res.status(200).json({ message: "Deal updated" });
+      const dealId = req.params.id;
+      const deal = req.body;
+      if (!deal.title || !deal.amount || !deal.closingDate || !deal.status) {
+        return res.status(400).json({ message: "Faltan campos obligatorios" });
+      }
+      const updatedDeal = yield DealsModel_1.default
+        .findByIdAndUpdate(dealId, deal, {
+          new: true,
+        })
+        .exec();
+      if (!updatedDeal) {
+        return res.status(404).json({ message: "Trato no encontrado" });
+      }
+      // Actualizar campos personalizados
+      yield DealsFieldsValuesModel_1.default
+        .deleteMany({ deal: dealId })
+        .exec();
+      const dealFields = deal.fields.map((field) => ({
+        deal: dealId,
+        field: field.field,
+        value: field.value,
+      }));
+      yield DealsFieldsValuesModel_1.default.insertMany(dealFields);
+      // Manejar actualización de productos
+      if (deal.dealProducts && deal.dealProducts.length > 0) {
+        // Eliminar productos anteriores asociados a este trato
+        yield ProductAcquisitionModel_1.default.deleteMany({ dealId }).exec();
+        // Crear nuevas adquisiciones de productos
+        const acquisitions = deal.dealProducts.map((product) => {
+          var _a, _b;
+          return {
+            organizationId:
+              (_a = req.user) === null || _a === void 0
+                ? void 0
+                : _a.organizationId,
+            clientId: deal.associatedContactId,
+            productId: product.id,
+            variantId: product.variantId || undefined,
+            dealId: dealId,
+            quantity: parseInt(product.quantity) || 1,
+            priceAtAcquisition: parseFloat(product.priceAtAcquisition) || 0,
+            acquisitionDate: new Date(deal.closingDate),
+            status: "active",
+            userId: (_b = req.user) === null || _b === void 0 ? void 0 : _b._id,
+          };
+        });
+        // Insertar las nuevas adquisiciones
+        yield ProductAcquisitionModel_1.default.insertMany(acquisitions);
+      }
+      return res.status(200).json({ message: "Deal updated" });
+    } catch (error) {
+      console.error("Error editando el trato:", error);
+      return res.status(500).json({ message: "Error en el servidor" });
     }
-    catch (error) {
-        console.error("Error editando el trato:", error);
-        return res.status(500).json({ message: "Error en el servidor" });
-    }
-});
+  });
 exports.editDeal = editDeal;
 /**
  * Deletes a deal from the database based on the provided deal ID.
@@ -413,18 +490,18 @@ exports.editDeal = editDeal;
  * @param {Response} res - The HTTP response object, used to send back responses to the client.
  * @returns {Promise<void>} - A Promise representing the completion of the deletion operation.
  */
-const deleteDeal = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+const deleteDeal = (req, res) =>
+  __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const dealId = req.params.id;
-        if (!dealId) {
-            return res.status(400).json({ message: "Falta el id del trato" });
-        }
-        const deal = yield DealsModel_1.default.deleteOne({ _id: dealId }).exec();
-        return res.status(200).json({ message: "Deal deleted" });
+      const dealId = req.params.id;
+      if (!dealId) {
+        return res.status(400).json({ message: "Falta el id del trato" });
+      }
+      const deal = yield DealsModel_1.default.deleteOne({ _id: dealId }).exec();
+      return res.status(200).json({ message: "Deal deleted" });
+    } catch (error) {
+      console.error("Error eliminando el trato:", error);
+      res.status(500).json({ message: "Error en el servidor" });
     }
-    catch (error) {
-        console.error("Error eliminando el trato:", error);
-        res.status(500).json({ message: "Error en el servidor" });
-    }
-});
+  });
 exports.deleteDeal = deleteDeal;
