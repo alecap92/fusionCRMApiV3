@@ -403,6 +403,8 @@ export const editDeal = async (
     const dealId = req.params.id;
     const deal = req.body;
 
+    console.log(deal, 1);
+
     if (!deal.title || !deal.amount || !deal.closingDate || !deal.status) {
       return res.status(400).json({ message: "Faltan campos obligatorios" });
     }
@@ -444,6 +446,8 @@ export const editDeal = async (
         status: "active",
         userId: req.user?._id,
       }));
+
+      console.log(acquisitions, 2);
 
       // Insertar las nuevas adquisiciones
       await ProductAcquisitionModel.insertMany(acquisitions);
