@@ -4,6 +4,7 @@ import axios, { AxiosError } from "axios";
 import MessageModel from "../../../models/MessageModel";
 import IntegrationsModel from "../../../models/IntegrationsModel";
 import ConversationModel from "../../../models/ConversationModel";
+import ConversationPipeline from "../../../models/ConversationPipelineModel";
 
 interface TemplateComponent {
   type: string;
@@ -144,6 +145,19 @@ export const sendTemplateMessage = async (req: Request, res: Response) => {
     let conversationId;
     if (!conversation) {
       try {
+        // Obtener el pipeline predeterminado dinámicamente
+        const defaultPipeline = await ConversationPipeline.findOne({
+          organization: organizationId,
+          isDefault: true,
+        });
+
+        if (!defaultPipeline) {
+          return res.status(400).json({
+            error:
+              "No se encontró un pipeline predeterminado para la organización",
+          });
+        }
+
         const newConversation = new ConversationModel({
           organization: organizationId,
           title: phoneNumber,
@@ -169,7 +183,7 @@ export const sendTemplateMessage = async (req: Request, res: Response) => {
             },
           ],
           isArchived: false,
-          pipeline: "6814ef02e3de1af46109d105",
+          pipeline: defaultPipeline._id,
           assignedTo: req.user._id,
         });
         await newConversation.save();

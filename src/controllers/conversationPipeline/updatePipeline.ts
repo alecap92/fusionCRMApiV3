@@ -6,7 +6,7 @@ import Conversation from "../../models/ConversationModel";
  * Actualiza un pipeline de conversación
  */
 export const updatePipeline = async (
-  req: Request & { organization?: any },
+  req: Request & { user?: any },
   res: Response
 ) => {
   try {
@@ -93,12 +93,12 @@ export const updatePipeline = async (
  * Elimina un pipeline de conversación
  */
 export const deletePipeline = async (
-  req: Request & { organization?: any },
+  req: Request & { user?: any },
   res: Response
 ) => {
   try {
     const { id } = req.params;
-    const organizationId = req.organization;
+    const organizationId = req.user?.organizationId;
 
     // Verificar si es el único pipeline o si es el predeterminado
     const pipelineCount = await ConversationPipeline.countDocuments({

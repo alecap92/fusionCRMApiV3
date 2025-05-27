@@ -5,11 +5,11 @@ import ConversationPipeline from "../../models/ConversationPipelineModel";
  * Obtiene la lista de pipelines de conversación para una organización
  */
 export const getPipelines = async (
-  req: Request & { organization?: any },
+  req: Request & { user?: any },
   res: Response
 ) => {
   try {
-    const organizationId = req.organization;
+    const organizationId = req.user?.organizationId;
 
     const pipelines = await ConversationPipeline.find({
       organization: organizationId,
@@ -34,12 +34,12 @@ export const getPipelines = async (
  * Obtiene un pipeline específico por ID
  */
 export const getPipelineById = async (
-  req: Request & { organization?: any },
+  req: Request & { user?: any },
   res: Response
 ) => {
   try {
     const { id } = req.params;
-    const organizationId = req.organization;
+    const organizationId = req.user?.organizationId;
 
     const pipeline = await ConversationPipeline.findOne({
       _id: id,
@@ -71,11 +71,11 @@ export const getPipelineById = async (
  * Obtiene el pipeline predeterminado de la organización
  */
 export const getDefaultPipeline = async (
-  req: Request & { organization?: any },
+  req: Request & { user?: any },
   res: Response
 ) => {
   try {
-    const organizationId = req.organization;
+    const organizationId = req.user?.organizationId;
 
     const pipeline = await ConversationPipeline.findOne({
       organization: organizationId,
