@@ -29,7 +29,6 @@ interface IConversation extends Document {
   isResolved: boolean;
   priority: "low" | "medium" | "high";
   tags: string[];
-  leadScore: number;
   firstContactTimestamp: Date;
   metadata: IMetadata[];
   isArchived: boolean;
@@ -88,7 +87,6 @@ const conversationSchema = new Schema<IConversation>(
       default: "medium",
     },
     tags: [{ type: String }],
-    leadScore: { type: Number, default: 0 },
     firstContactTimestamp: { type: Date },
     metadata: [metadataSchema],
     isArchived: { type: Boolean, default: false },

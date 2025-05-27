@@ -88,7 +88,7 @@ export const uploadFile = async (req: Request, res: Response) => {
     await file.save();
     res.status(201).json(file);
   } catch (error) {
-    console.log(error)
+    console.log(error);
     res.status(500).json({ message: "Error al subir el archivo", error });
   }
 };
@@ -102,12 +102,11 @@ export const getFiles = async (req: Request, res: Response) => {
       const files = await File.find({
         organization: req.user!.organizationId,
         isVisible: isVisible,
-      })
+      }).limit(100);
 
       res.status(200).json(files);
       return;
     }
-
 
     const files = await File.find({ organization: req.user!.organizationId });
     res.status(200).json(files);

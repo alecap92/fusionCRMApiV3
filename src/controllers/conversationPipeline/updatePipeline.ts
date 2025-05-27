@@ -12,7 +12,7 @@ export const updatePipeline = async (
   try {
     const { id } = req.params;
     const { name, stages, isDefault } = req.body;
-    const organizationId = req.organization;
+    const organizationId = req.user?.organizationId;
 
     const pipeline = await ConversationPipeline.findOne({
       _id: id,

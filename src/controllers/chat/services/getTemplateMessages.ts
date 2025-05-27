@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 import axios from "axios";
 import Organization from "../../../models/OrganizationModel";
+import IntegrationsModel from "../../../models/IntegrationsModel";
 
 interface TemplateComponent {
   type: string;
@@ -26,16 +27,21 @@ export const getTemplatesMessages = async (
     return;
   }
 
-  const { organizationId } = req.user;
+  const organizationId = req.user.organizationId;
 
   const organization = await Organization.findById(organizationId);
 
+  const integration = await IntegrationsModel.findOne({
+    organizationId: organizationId,
+    service: "whatsapp",
+  });
+
   try {
     const response = await axios.get(
-      `${process.env.WHATSAPP_API_URL}/${organization?.settings.whatsapp.whatsAppBusinessAccountID}/message_templates`,
+      `${process.env.WHATSAPP_API_URL}/${integration?.credentials.whatsappAccountBusinessIdentifier}/message_templates`,
       {
         headers: {
-          Authorization: `Bearer ${organization?.settings.whatsapp.accessToken}`,
+          Authorization: `Bearer ${integration?.credentials.accessToken}`,
         },
       }
     );

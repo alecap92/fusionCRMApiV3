@@ -2,14 +2,13 @@ import { Request, Response } from "express";
 import MessageModel from "../../../models/MessageModel";
 
 export const markMessagesAsRead = async (req: Request, res: Response) => {
-  const { contact } = req.body;
+  const body = req.body;
   const organizationId = req.user?.organizationId;
-
   if (!req.user) {
     return res.status(401).json({ error: "User not authenticated" });
   }
 
-  if (!contact) {
+  if (!body.contact) {
     return res.status(400).json({ error: "Contact is required" });
   }
 
@@ -19,8 +18,7 @@ export const markMessagesAsRead = async (req: Request, res: Response) => {
       {
         isRead: false,
         organization: organizationId,
-        from: contact,
-        direction: "incoming", // Solo marcar como leídos los mensajes entrantes
+        $or: [{ from: body.contact }, { to: body.contact }],
       },
       { $set: { isRead: true } }
     );

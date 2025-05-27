@@ -36,6 +36,10 @@ const CONFIG = {
     DISCONNECT: "disconnect",
     NEW_NOTIFICATION: "newNotification",
     NEW_MESSAGE: "newMessage",
+    SUBSCRIBE_CONVERSATION: "subscribe_conversation",
+    UNSUBSCRIBE_CONVERSATION: "unsubscribe_conversation",
+    MESSAGE_STATUS: "message_status",
+    WHATSAPP_MESSAGE: "whatsapp_message",
   },
   ROOM_PREFIX: {
     ORGANIZATION: "organization_",
@@ -136,6 +140,35 @@ const setupSocketEvents = (socket: SocketWithUser): void => {
     socket.leave(room);
     console.log(`Socket ${socket.id} left room: ${room}`);
   });
+
+  // Suscribirse a una conversación
+  socket.on(CONFIG.EVENTS.SUBSCRIBE_CONVERSATION, (conversationId: string) => {
+    if (typeof conversationId !== "string" || !conversationId.trim()) {
+      return;
+    }
+
+    const conversationRoom = `conversation_${conversationId}`;
+    socket.join(conversationRoom);
+    console.log(
+      `Socket ${socket.id} subscribed to conversation: ${conversationId}`
+    );
+  });
+
+  // Desuscribirse de una conversación
+  socket.on(
+    CONFIG.EVENTS.UNSUBSCRIBE_CONVERSATION,
+    (conversationId: string) => {
+      if (typeof conversationId !== "string" || !conversationId.trim()) {
+        return;
+      }
+
+      const conversationRoom = `conversation_${conversationId}`;
+      socket.leave(conversationRoom);
+      console.log(
+        `Socket ${socket.id} unsubscribed from conversation: ${conversationId}`
+      );
+    }
+  );
 };
 
 /**

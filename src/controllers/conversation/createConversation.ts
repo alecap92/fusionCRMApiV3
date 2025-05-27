@@ -18,7 +18,6 @@ export const createConversation = async (
       assignedTo,
       priority = "medium",
       tags = [],
-      leadScore = 0,
       metadata = [],
     } = req.body;
 
@@ -72,7 +71,6 @@ export const createConversation = async (
       assignedTo: assignedTo || userId,
       priority,
       tags,
-      leadScore,
       firstContactTimestamp: new Date(),
       metadata,
     });

@@ -19,6 +19,7 @@ router.delete("/pipelines/:id", pipelineController.deletePipeline);
 // Rutas para conversaciones
 router.post("/", conversationController.createConversation);
 router.get("/", conversationController.getConversations);
+router.get("/search", conversationController.searchConversations);
 router.get("/kanban", conversationController.getConversationsKanban);
 router.get("/stats", conversationController.getConversationStats);
 router.get("/unread", conversationController.getUnreadMessagesCount);
@@ -26,6 +27,7 @@ router.get("/:id", conversationController.getConversationById);
 router.put("/:id", conversationController.updateConversation);
 router.put("/:id/stage", conversationController.moveConversationStage);
 router.put("/:id/pipeline", conversationController.changeConversationPipeline);
+router.delete("/:id", conversationController.deleteConversation);
 
 // Rutas para mensajes dentro de conversaciones
 router.post("/:conversationId/messages", conversationController.addMessage);

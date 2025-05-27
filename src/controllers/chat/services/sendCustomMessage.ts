@@ -8,6 +8,7 @@ import IntegrationsModel from "../../../models/IntegrationsModel";
 import ConversationModel from "../../../models/ConversationModel";
 import { createConversation } from "../../../services/conversations/createConversation";
 import ConversationPipelineModel from "../../../models/ConversationPipelineModel";
+import { subirArchivo } from "../../../config/aws";
 
 const apiUrl = process.env.WHATSAPP_API_URL;
 
@@ -15,7 +16,16 @@ export const sendCustomMessage = async (
   req: Request,
   res: Response
 ): Promise<Response> => {
+  console.log(req.body, "req.body");
+  console.log(req.file, "req.file");
   const { to, message, messageType, mediaUrl, caption } = req.body;
+  const file = req.file;
+
+  let fileUrl: string | null = null;
+  if (file) {
+    // Guardar el archivo en S3
+    fileUrl = await subirArchivo(file.buffer, file.originalname, file.mimetype);
+  }
 
   if (!to || !messageType || (messageType === "text" && !message)) {
     console.error("Missing required parameters");
@@ -76,41 +86,66 @@ export const sendCustomMessage = async (
         break;
 
       case "image":
-        if (!mediaUrl) {
+        if (!fileUrl) {
           return res
             .status(400)
             .json({ error: "mediaUrl is required for image messages" });
         }
+
         payload = {
           messaging_product: "whatsapp",
           to,
           type: "image",
           image: {
-            link: mediaUrl,
+            link: fileUrl,
             caption: caption || "", // Caption es opcional
           },
+          message: "imagen",
         };
         break;
 
       case "document":
-        if (!mediaUrl) {
-          return res
-            .status(400)
-            .json({ error: "mediaUrl is required for document messages" });
+        if (!fileUrl && !mediaUrl) {
+          return res.status(400).json({
+            error:
+              "Se requiere un archivo o mediaUrl para mensajes de tipo document",
+          });
         }
+
+        // Validar el tipo de archivo si se está subiendo uno nuevo
+        if (file) {
+          const allowedDocumentTypes = [
+            "application/pdf",
+            "application/msword",
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            "application/vnd.ms-excel",
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            "text/plain",
+            "text/csv",
+          ];
+
+          if (!allowedDocumentTypes.includes(file.mimetype)) {
+            return res.status(400).json({
+              error: "Tipo de archivo no permitido para documentos",
+              allowedTypes: allowedDocumentTypes,
+            });
+          }
+        }
+
         payload = {
           messaging_product: "whatsapp",
           to,
           type: "document",
           document: {
-            link: mediaUrl,
-            caption: caption || "", // Caption es opcional
+            link: fileUrl || mediaUrl, // Usar fileUrl si existe, sino mediaUrl
+            caption: caption || "",
           },
+          message: "documento",
         };
         break;
 
       case "video":
-        if (!mediaUrl) {
+        if (!fileUrl) {
           return res
             .status(400)
             .json({ error: "mediaUrl is required for video messages" });
@@ -120,14 +155,15 @@ export const sendCustomMessage = async (
           to,
           type: "video",
           video: {
-            link: mediaUrl,
+            link: fileUrl,
             caption: caption || "", // Caption es opcional
           },
+          message: "video",
         };
         break;
 
       case "audio":
-        if (!mediaUrl) {
+        if (!fileUrl) {
           return res
             .status(400)
             .json({ error: "mediaUrl is required for audio messages" });
@@ -137,8 +173,9 @@ export const sendCustomMessage = async (
           to,
           type: "audio",
           audio: {
-            link: mediaUrl,
+            link: fileUrl,
           },
+          message: "audio",
         };
         break;
 
@@ -203,27 +240,6 @@ export const sendCustomMessage = async (
     });
 
     if (!conversation) {
-      // Crear una nueva conversación
-      // conversation = await ConversationModel.create({
-      //   title: `Conversación con ${to}`,
-      //   organization: organization._id,
-      //   participants: {
-      //     user: {
-      //       type: "User",
-      //       reference: user._id,
-      //     },
-      //     contact: {
-      //       type: "Contact",
-      //       reference: to,
-      //     },
-      //   },
-      //   pipeline: "6814ef02e3de1af46109d105", // pipeline id por defecto
-      //   currentStage: 0,
-      //   assignedTo: user._id,
-      //   priority: "medium",
-      //   firstContactTimestamp: new Date(),
-      // });
-
       const conversationPipeline: any = await ConversationPipelineModel.findOne(
         {
           organization: organization._id,
@@ -260,10 +276,10 @@ export const sendCustomMessage = async (
         organization: organization._id,
         from: integration.credentials.phoneNumber || "",
         to,
-        message: messageType === "text" ? message : mediaUrl,
+        message: messageType === "text" ? message : fileUrl,
         direction: "outgoing",
         type: messageType,
-        mediaUrl: mediaUrl || "",
+        mediaUrl: fileUrl || "",
         timestamp: new Date().toISOString(),
         messageId: messageId,
         conversation: conversation?._id,

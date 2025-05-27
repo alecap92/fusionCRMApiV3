@@ -9,6 +9,7 @@ import { sendNotification } from "./pushNotificationService";
 import IntegrationsModel from "../../../models/IntegrationsModel";
 import ConversationModel from "../../../models/ConversationModel";
 import ConversationPipelineModel from "../../../models/ConversationPipelineModel";
+import { getSocketInstance } from "../../../config/socket";
 
 export const handleWebhook = async (
   req: Request,
@@ -22,15 +23,48 @@ export const handleWebhook = async (
       return;
     }
 
+    // Validar la estructura del webhook
+    if (!body.entry?.[0]?.changes?.[0]?.value) {
+      console.error("Invalid webhook structure:", body);
+      res.status(400).json({ error: "Invalid webhook structure" });
+      return;
+    }
+
+    const value = body.entry[0].changes[0].value;
+
+    // Verificar si es un webhook de status (confirmación de envío)
+    if (value.statuses) {
+      console.log("Received status webhook:", value.statuses[0].errors);
+      console.log("Received status webhook:", value.statuses[0]?.status);
+      res.status(500).send({
+        message: "Status webhook received",
+        error: value.statuses[0].errors,
+      });
+      return;
+    }
+
+    // Si no es un webhook de status, continuar con el procesamiento de mensajes
+    const profileName = value.contacts?.[0]?.profile?.name
+      ? `${value.contacts[0].profile.name} (${value.contacts[0].wa_id})`
+      : "Unknown Contact";
+
+    console.log("Processing message from:", profileName);
+
     for (const entry of body.entry || []) {
       const { changes } = entry;
 
       for (const change of changes || []) {
         const value = change.value;
 
-        if (!value.messages) continue;
+        if (!value.messages) {
+          continue; // Silenciosamente ignoramos webhooks sin mensajes
+        }
 
         const message = value.messages[0];
+        if (!message) {
+          continue;
+        }
+
         const { from, timestamp, type } = message;
         const to = value.metadata?.display_phone_number;
 
@@ -114,10 +148,20 @@ export const handleWebhook = async (
           "participants.contact.reference": from,
         });
 
+        /*
+        Una conversacion se crea doble si un chat que avanzo de etapa se vuelve a abrir? 
+        No, no deben haber dos conversacion, tocaria buscarlas y actualizar la conversacion para reabrirla.
+
+        Entonces:
+        1. Si no hay conversacion, crear una nueva
+        2. Si hay conversacion, actualizar la conversacion para reabrirla (como saber que currentStage es?)
+        3. Si hay conversacion, agregar el mensaje a la conversacion
+        */
+
         // Crear conversación si no existe
         if (!conversation) {
           conversation = await ConversationModel.create({
-            title: from,
+            title: profileName,
             organization: organization,
             participants: {
               user: {
@@ -129,28 +173,41 @@ export const handleWebhook = async (
                 reference: from,
               },
             },
-            pipeline: pipeline?._id, // pipeline id
+            pipeline: pipeline?._id,
             currentStage: 0,
             assignedTo: systemUserId,
-            priority: "medium",
-            tags: ["servicio premium", "potencial cliente"],
-            leadScore: 65,
+            priority: "low",
+            tags: [],
             firstContactTimestamp: new Date(),
-            metadata: [
-              {
-                key: "origen",
-                value: "whatsapp",
-              },
-              {
-                key: "interés",
-                value: "consulta inicial",
-              },
-            ],
+            metadata: [],
           });
         }
 
+        const lastMessage = await MessageModel.findOne({
+          from: from,
+        }).sort({ timestamp: -1 });
+
+        if (lastMessage) {
+          const lastMessageDate = new Date(lastMessage.timestamp);
+          const now = new Date();
+          const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+
+          if (lastMessageDate < oneDayAgo && conversation.currentStage === 3) {
+            // 3 es el stage de "Finalizado", hay que revisar despues como hacerlo dinamico.
+            conversation.currentStage = 0;
+            conversation.metadata.push({
+              key: "auto-reopen",
+              value:
+                "message received after 24h from finalized" +
+                new Date().toISOString(),
+            });
+
+            await conversation.save();
+          }
+        }
+
         // Crear mensaje
-        await MessageModel.create({
+        const newMessage = await MessageModel.create({
           user: systemUserId,
           organization: organization._id,
           from,
@@ -165,6 +222,40 @@ export const handleWebhook = async (
           replyToMessage: originalMessage?._id || null,
           messageId: message.id,
           conversation: conversation._id,
+        });
+
+        // Emitir evento de nuevo mensaje a través de socket
+        const io = getSocketInstance();
+
+        // Emitir a la sala de la conversación
+        io.to(`conversation_${conversation._id}`).emit("newMessage", {
+          ...newMessage.toObject(),
+          direction: "incoming",
+        });
+        console.log(
+          `[Socket] Mensaje emitido a la sala de conversación: conversation_${conversation._id}`
+        );
+        console.log(`[Socket] Detalles del mensaje:`, {
+          messageId: newMessage._id,
+          from: from,
+          to: to,
+          type: type,
+          timestamp: new Date(parseInt(timestamp) * 1000),
+        });
+
+        // Emitir a la sala de la organización
+        io.to(`organization_${organization._id}`).emit("whatsapp_message", {
+          message: newMessage.toObject(),
+          contact: from,
+          conversationId: conversation._id,
+        });
+        console.log(
+          `[Socket] Notificación emitida a la organización: organization_${organization._id}`
+        );
+        console.log(`[Socket] Detalles de la notificación:`, {
+          contact: from,
+          conversationId: conversation._id,
+          organizationId: organization._id,
         });
 
         const toTokens = ["ExponentPushToken[I5cjWVDWDbnjGPUqFdP2dL]"];

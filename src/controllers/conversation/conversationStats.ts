@@ -126,21 +126,6 @@ export const getConversationStats = async (
       },
     ]);
 
-    // Estadísticas de lead score
-    const leadScoreStats = await Conversation.aggregate([
-      {
-        $match: baseQuery,
-      },
-      {
-        $group: {
-          _id: null,
-          avgLeadScore: { $avg: "$leadScore" },
-          maxLeadScore: { $max: "$leadScore" },
-          minLeadScore: { $min: "$leadScore" },
-        },
-      },
-    ]);
-
     // Estadísticas por usuario asignado
     const assigneeStats = await Conversation.aggregate([
       {
@@ -220,14 +205,6 @@ export const getConversationStats = async (
           result[stat._id] = stat.count;
           return result;
         }, {}),
-        leadScoreStats:
-          leadScoreStats.length > 0
-            ? leadScoreStats[0]
-            : {
-                avgLeadScore: 0,
-                maxLeadScore: 0,
-                minLeadScore: 0,
-              },
         assigneeStats,
       },
     });

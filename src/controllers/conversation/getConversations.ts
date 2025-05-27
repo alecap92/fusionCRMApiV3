@@ -2,6 +2,7 @@ import { Request, Response } from "express";
 import Conversation from "../../models/ConversationModel";
 import ConversationPipeline from "../../models/ConversationPipelineModel";
 import Message from "../../models/MessageModel";
+import ContactModel from "../../models/ContactModel";
 
 /**
  * Obtiene lista de conversaciones para una organización
@@ -52,7 +53,7 @@ export const getConversations = async (
       .skip(skip)
       .limit(limitNumber)
       .populate("lastMessage")
-      .populate("assignedTo", "name email");
+      .populate("assignedTo", "name email firstName lastName");
 
     // Procesar las conversaciones para manejar los casos donde participants.contact.reference es string
     const processedConversations = conversations.map((conversation: any) => {
@@ -71,14 +72,41 @@ export const getConversations = async (
         };
       }
 
+      // Add last message timestamp
+      conversationObj.lastMessageTimestamp =
+        conversationObj.lastMessage?.timestamp;
+
+      conversationObj.mobile = conversationObj.participants.contact.reference;
+
       return conversationObj;
     });
 
     const total = await Conversation.countDocuments(queryConditions);
 
+    // Obtener el último mensaje para cada conversación
+    const conversationsWithLastMessage = await Promise.all(
+      processedConversations.map(async (conversation) => {
+        const lastMessage = await Message.findOne({
+          $or: [
+            {
+              from: conversation.participants.contact.reference,
+            },
+            {
+              to: conversation.participants.contact.reference,
+            },
+          ],
+        }).sort({ timestamp: -1 });
+
+        return {
+          ...conversation,
+          lastMessage: lastMessage || null,
+        };
+      })
+    );
+
     return res.status(200).json({
       success: true,
-      data: processedConversations,
+      data: conversationsWithLastMessage,
       pagination: {
         total,
         page: pageNumber,
@@ -105,7 +133,16 @@ export const getConversationsKanban = async (
 ) => {
   try {
     const organizationId = req.user?.organizationId;
-    const { pipelineId, isResolved, assignedTo, tags, search } = req.query;
+    const {
+      pipelineId,
+      isResolved,
+      assignedTo,
+      tags,
+      search,
+      page = 1,
+      limit = 10,
+      stageId, // Nuevo parámetro para cargar conversaciones de una etapa específica
+    } = req.query;
 
     // Si no se proporciona un pipelineId, usar el predeterminado
     let pipeline;
@@ -135,6 +172,13 @@ export const getConversationsKanban = async (
       stageOrder: stage.order,
       stageColor: stage.color,
       conversations: [] as any[],
+      pagination: {
+        page: 1,
+        limit: parseInt(limit as string, 10),
+        total: 0,
+        pages: 0,
+        hasMore: false,
+      },
     }));
 
     // Filtros base para todas las etapas
@@ -163,21 +207,155 @@ export const getConversationsKanban = async (
       baseQueryConditions.title = { $regex: search, $options: "i" };
     }
 
-    // Obtener todas las conversaciones para este pipeline que cumplan con los filtros
-    const allConversations = await Conversation.find(baseQueryConditions)
-      .sort({ lastMessageTimestamp: -1 })
-      .populate("lastMessage")
-      .populate("assignedTo", "name email profilePicture");
+    const pageNumber = parseInt(page as string, 10);
+    const limitNumber = parseInt(limit as string, 10);
 
-    console.log(allConversations);
+    // Si se especifica un stageId, solo cargar conversaciones para esa etapa (paginación)
+    if (stageId) {
+      const stageIndex = pipeline.stages.findIndex(
+        (stage: any) => stage._id.toString() === stageId
+      );
 
-    // Distribuir las conversaciones en las etapas correspondientes
-    for (const conversation of allConversations) {
-      const stageIndex = conversation.currentStage;
-      // Asegurarse de que el índice de etapa es válido
-      if (stageIndex >= 0 && stageIndex < kanbanData.length) {
-        kanbanData[stageIndex].conversations.push(conversation);
+      if (stageIndex !== -1) {
+        const stageQueryConditions = {
+          ...baseQueryConditions,
+          currentStage: stageIndex,
+        };
+
+        const skip = (pageNumber - 1) * limitNumber;
+
+        const conversations = await Conversation.find(stageQueryConditions)
+          .sort({ lastMessageTimestamp: -1 })
+          .skip(skip)
+          .limit(limitNumber)
+          .populate("lastMessage")
+          .populate("assignedTo", "name email profilePicture");
+
+        const total = await Conversation.countDocuments(stageQueryConditions);
+        const pages = Math.ceil(total / limitNumber);
+
+        // Procesar las conversaciones
+        const processedConversations = conversations.map(
+          (conversation: any) => {
+            const conversationObj = conversation.toObject();
+
+            if (
+              conversationObj.participants &&
+              conversationObj.participants.contact &&
+              typeof conversationObj.participants.contact.reference === "string"
+            ) {
+              conversationObj.participants.contact.displayInfo = {
+                phone: conversationObj.participants.contact.reference,
+                name: conversationObj.participants.contact.reference,
+              };
+            }
+
+            conversationObj.lastMessageTimestamp =
+              conversationObj.lastMessage?.timestamp;
+            conversationObj.mobile =
+              conversationObj.participants.contact.reference;
+
+            return conversationObj;
+          }
+        );
+
+        // Obtener el último mensaje para cada conversación
+        const conversationsWithLastMessage = await Promise.all(
+          processedConversations.map(async (conversation) => {
+            const lastMessage = await Message.findOne({
+              $or: [
+                { from: conversation.participants.contact.reference },
+                { to: conversation.participants.contact.reference },
+              ],
+            }).sort({ timestamp: -1 });
+
+            return {
+              ...conversation,
+              lastMessage: lastMessage || null,
+            };
+          })
+        );
+
+        return res.status(200).json({
+          success: true,
+          data: {
+            stageId,
+            conversations: conversationsWithLastMessage,
+            pagination: {
+              page: pageNumber,
+              limit: limitNumber,
+              total,
+              pages,
+              hasMore: pageNumber < pages,
+            },
+          },
+        });
       }
+    }
+
+    // Carga inicial: obtener las primeras conversaciones de cada etapa
+    for (let i = 0; i < pipeline.stages.length; i++) {
+      const stageQueryConditions = {
+        ...baseQueryConditions,
+        currentStage: i,
+      };
+
+      const conversations = await Conversation.find(stageQueryConditions)
+        .sort({ lastMessageTimestamp: -1 })
+        .limit(limitNumber)
+        .populate("lastMessage")
+        .populate("assignedTo", "name email profilePicture");
+
+      const total = await Conversation.countDocuments(stageQueryConditions);
+      const pages = Math.ceil(total / limitNumber);
+
+      // Procesar las conversaciones
+      const processedConversations = conversations.map((conversation: any) => {
+        const conversationObj = conversation.toObject();
+
+        if (
+          conversationObj.participants &&
+          conversationObj.participants.contact &&
+          typeof conversationObj.participants.contact.reference === "string"
+        ) {
+          conversationObj.participants.contact.displayInfo = {
+            phone: conversationObj.participants.contact.reference,
+            name: conversationObj.participants.contact.reference,
+          };
+        }
+
+        conversationObj.lastMessageTimestamp =
+          conversationObj.lastMessage?.timestamp;
+        conversationObj.mobile = conversationObj.participants.contact.reference;
+
+        return conversationObj;
+      });
+
+      // Obtener el último mensaje para cada conversación
+      const conversationsWithLastMessage = await Promise.all(
+        processedConversations.map(async (conversation) => {
+          const lastMessage = await Message.findOne({
+            $or: [
+              { from: conversation.participants.contact.reference },
+              { to: conversation.participants.contact.reference },
+            ],
+          }).sort({ timestamp: -1 });
+
+          return {
+            ...conversation,
+            lastMessage: lastMessage || null,
+          };
+        })
+      );
+
+      kanbanData[i].conversations = conversationsWithLastMessage;
+      kanbanData[i].pagination = {
+        page: 1,
+        limit: limitNumber,
+        total,
+        pages,
+        hasMore: pages > 1,
+      };
     }
 
     return res.status(200).json({
@@ -211,20 +389,57 @@ export const getConversationById = async (
   try {
     const { id } = req.params;
     const organizationId = req.user?.organizationId;
-    const { page = 1, limit = 50 } = req.query;
+    const { page = 1, limit = 500 } = req.query;
 
     const conversation = await Conversation.findOne({
       _id: id,
       organization: organizationId,
     })
       .populate("assignedTo", "name email profilePicture")
-      .populate("pipeline");
+      .populate("pipeline")
+      .populate("lastMessage");
 
     if (!conversation) {
       return res.status(404).json({
         success: false,
         message: "Conversación no encontrada",
       });
+    }
+
+    // Buscar si el contacto existe en la base de datos
+    let contact = null;
+    try {
+      if (
+        conversation.participants &&
+        conversation.participants.contact &&
+        conversation.participants.contact.reference
+      ) {
+        contact = await ContactModel.findOne({
+          $or: [
+            {
+              "properties.key": "mobile",
+              "properties.value": {
+                $regex: conversation.participants.contact.reference,
+              },
+            },
+            {
+              "properties.key": "phone",
+              "properties.value": {
+                $regex: conversation.participants.contact.reference,
+              },
+            },
+            {
+              "properties.key": "email",
+              "properties.value": {
+                $regex: conversation.participants.contact.reference,
+              },
+            },
+          ],
+        });
+      }
+    } catch (error) {
+      console.error("Error obteniendo el contacto:", error);
+      // Continuamos con contact = null
     }
 
     // Procesar conversación
@@ -241,20 +456,35 @@ export const getConversationById = async (
         phone: conversationObj.participants.contact.reference,
         name: conversationObj.participants.contact.reference, // Usar el teléfono como nombre por defecto
       };
+
+      conversationObj.participants.contact.contactId = contact?._id || null;
     }
+
+    // Agregar lastMessageTimestamp y mobile
+    conversationObj.lastMessageTimestamp =
+      conversationObj.lastMessage?.timestamp;
+    conversationObj.mobile =
+      conversationObj.participants.contact.reference || "SIN MOVIL";
 
     // Obtener mensajes de la conversación
     const pageNumber = parseInt(page as string, 10);
     const limitNumber = parseInt(limit as string, 10);
-    const skip = (pageNumber - 1) * limitNumber;
-
-    // Cambiar el orden para mostrar los mensajes cronológicamente (más antiguos primero)
-    const messages = await Message.find({ conversation: id })
-      .sort({ timestamp: 1 }) // Cambiando de -1 a 1 para ordenar ascendentemente
-      .skip(skip)
-      .limit(limitNumber);
 
     const totalMessages = await Message.countDocuments({ conversation: id });
+
+    // Obtener todos los mensajes ordenados cronológicamente y luego aplicar paginación
+    const allMessages = await Message.find({ conversation: id })
+      .sort({ timestamp: 1 }) // Orden cronológico (más antiguos primero)
+      .exec();
+
+    // Aplicar paginación manualmente para mantener el orden cronológico
+    const startIndex = Math.max(
+      0,
+      allMessages.length - pageNumber * limitNumber
+    );
+    const endIndex = allMessages.length - (pageNumber - 1) * limitNumber;
+
+    const messages = allMessages.slice(startIndex, endIndex);
 
     return res.status(200).json({
       success: true,

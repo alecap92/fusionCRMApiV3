@@ -11,17 +11,17 @@ export const updateConversation = async (
 ) => {
   try {
     const { id } = req.params;
+
     const {
       title,
       assignedTo,
       isResolved,
       priority,
       tags,
-      leadScore,
       metadata,
+      currentStage,
     } = req.body;
-
-    const organizationId = req.organization;
+    const organizationId = req.user?.organizationId;
 
     const conversation = await Conversation.findOne({
       _id: id,
@@ -41,8 +41,8 @@ export const updateConversation = async (
     if (isResolved !== undefined) conversation.isResolved = isResolved;
     if (priority !== undefined) conversation.priority = priority;
     if (tags !== undefined) conversation.tags = tags;
-    if (leadScore !== undefined) conversation.leadScore = leadScore;
     if (metadata !== undefined) conversation.metadata = metadata;
+    if (currentStage !== undefined) conversation.currentStage = currentStage;
 
     await conversation.save();
 

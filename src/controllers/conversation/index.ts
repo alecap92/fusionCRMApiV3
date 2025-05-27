@@ -16,3 +16,5 @@ export {
   getUnreadMessagesCount,
 } from "./addMessage";
 export { getConversationStats } from "./conversationStats";
+export { deleteConversation } from "./deleteConversation";
+export { searchConversations } from "./searchConversations";
