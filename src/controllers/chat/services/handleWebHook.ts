@@ -10,6 +10,9 @@ import IntegrationsModel from "../../../models/IntegrationsModel";
 import ConversationModel from "../../../models/ConversationModel";
 import ConversationPipelineModel from "../../../models/ConversationPipelineModel";
 import { getSocketInstance } from "../../../config/socket";
+import axios from "axios";
+import UserModel from "../../../models/UserModel";
+import { reopenConversationIfClosed } from "../../../services/conversations/createConversation";
 
 export const handleWebhook = async (
   req: Request,
@@ -181,28 +184,13 @@ export const handleWebhook = async (
             firstContactTimestamp: new Date(),
             metadata: [],
           });
-        }
-
-        const lastMessage = await MessageModel.findOne({
-          from: from,
-        }).sort({ timestamp: -1 });
-
-        if (lastMessage) {
-          const lastMessageDate = new Date(lastMessage.timestamp);
-          const now = new Date();
-          const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-
-          if (lastMessageDate < oneDayAgo && conversation.currentStage === 3) {
-            // 3 es el stage de "Finalizado", hay que revisar despues como hacerlo dinamico.
-            conversation.currentStage = 0;
-            conversation.metadata.push({
-              key: "auto-reopen",
-              value:
-                "message received after 24h from finalized" +
-                new Date().toISOString(),
-            });
-
-            await conversation.save();
+        } else {
+          // Si la conversación existe, verificar si debe reabrirse
+          const wasReopened = await reopenConversationIfClosed(conversation);
+          if (wasReopened) {
+            console.log(
+              `Conversación ${conversation._id} fue reabierta automáticamente`
+            );
           }
         }
 
@@ -223,6 +211,12 @@ export const handleWebhook = async (
           messageId: message.id,
           conversation: conversation._id,
         });
+
+        // Actualizar la conversación con el último mensaje
+        conversation.lastMessage = newMessage._id as any;
+        conversation.lastMessageTimestamp = newMessage.timestamp;
+        conversation.unreadCount = (conversation.unreadCount || 0) + 1;
+        await conversation.save();
 
         // Emitir evento de nuevo mensaje a través de socket
         const io = getSocketInstance();

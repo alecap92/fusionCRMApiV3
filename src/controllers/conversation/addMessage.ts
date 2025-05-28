@@ -2,6 +2,7 @@ import { Request, Response } from "express";
 import Conversation from "../../models/ConversationModel";
 import Message from "../../models/MessageModel";
 import { Types } from "mongoose";
+import { reopenConversationIfClosed } from "../../services/conversations/createConversation";
 
 /**
  * Agrega un nuevo mensaje a una conversación
@@ -50,6 +51,16 @@ export const addMessage = async (
       });
     }
 
+    // Si es un mensaje entrante, verificar si la conversación debe reabrirse
+    if (direction === "incoming") {
+      const wasReopened = await reopenConversationIfClosed(conversation);
+      if (wasReopened) {
+        console.log(
+          `Conversación ${conversation._id} fue reabierta automáticamente por mensaje entrante`
+        );
+      }
+    }
+
     // Crear el nuevo mensaje
     const newMessage = new Message({
       user: userId,
@@ -91,6 +102,8 @@ export const addMessage = async (
           _id: conversation._id,
           lastMessageTimestamp: conversation.lastMessageTimestamp,
           unreadCount: conversation.unreadCount,
+          currentStage: conversation.currentStage,
+          isResolved: conversation.isResolved,
         },
       },
       message: "Mensaje agregado exitosamente",
