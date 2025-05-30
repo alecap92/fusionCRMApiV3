@@ -49,6 +49,7 @@ import scoringRulesRouter from "./scoringRulesRouter";
 import analyticsRouter from "./analyticsRouter";
 import strategyRouter from "./strategyRouter";
 import conversationRouter from "./conversation.routes";
+import automationSystemRouter from "./automationSystemRouter";
 
 const routes = {
   authRouter,
@@ -85,6 +86,7 @@ const routes = {
   contactsApi,
   dealsApi,
   automationRouter,
+  automationSystemRouter,
   invoiceRouter,
   postRouter,
   socialAccountRouter,

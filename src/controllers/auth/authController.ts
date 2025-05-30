@@ -36,7 +36,13 @@ export const login = async (req: Request, res: Response) => {
         .json({ message: "No tiene organización asociada" });
     }
 
-    // 5. Generar token
+    // 5. Agregar organizationId al objeto user
+    const userWithOrganizationId = {
+      ...userObject,
+      organizationId: organization._id.toString(),
+    };
+
+    // 6. Generar token
     const token = generateToken(
       {
         _id: user._id,
@@ -51,7 +57,7 @@ export const login = async (req: Request, res: Response) => {
 
     return res.status(200).json({
       token: `${token}`,
-      user: userObject,
+      user: userWithOrganizationId,
       organization,
     });
   } catch (error) {
@@ -105,9 +111,16 @@ export const register = async (req: Request, res: Response) => {
       organizationId: newOrganization._id.toString(),
     });
 
+    // 6. Agregar organizationId al objeto user
+    const userWithOrganizationId: any = {
+      ...newUser.toObject(),
+      organizationId: newOrganization._id.toString(),
+    };
+    delete userWithOrganizationId.password; // Eliminar password del objeto
+
     return res.status(201).json({
       message: "Usuario registrado exitosamente",
-      user: newUser,
+      user: userWithOrganizationId,
       token: `${token}`,
       organization: newOrganization,
     });
@@ -124,7 +137,7 @@ export const verifyToken = async (req: IAuthRequest, res: Response) => {
       return res.status(401).json({ message: "Token no válido o expirado" });
     }
 
-    const { email, _id } = req.user;
+    const { email, _id, organizationId } = req.user;
 
     // Buscar usuario por ID o email (excluir campos sensibles)
     const user = await UserModel.findById(_id, {
@@ -146,9 +159,15 @@ export const verifyToken = async (req: IAuthRequest, res: Response) => {
       return res.status(404).json({ message: "Organización no encontrada" });
     }
 
-    // Respuesta con datos del usuario y organización
+    // Agregar organizationId al objeto user antes de devolverlo
+    const userWithOrganizationId = {
+      ...user.toObject(),
+      organizationId: organizationId || organization._id.toString(),
+    };
+
+    // Respuesta con datos del usuario (incluyendo organizationId) y organización
     return res.status(200).json({
-      user,
+      user: userWithOrganizationId,
       organization,
     });
   } catch (error) {

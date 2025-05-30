@@ -5,4 +5,6 @@ const pipelinesController_1 = require("../controllers/pipelines/pipelinesControl
 const router = (0, express_1.Router)();
 router.get("/", pipelinesController_1.getPipelines);
 router.post("/", pipelinesController_1.createPipeline);
+router.put("/:id", pipelinesController_1.updatePipeline);
+router.delete("/:id", pipelinesController_1.deletePipeline);
 exports.default = router;

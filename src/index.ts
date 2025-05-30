@@ -82,6 +82,10 @@ const configureRoutes = (app: Application): void => {
     { path: "/api/v1/email-templates", router: routes.emailTemplatesRouter },
     { path: "/api/v1/integrations", router: routes.integrationsRouter },
     { path: "/api/v1/automations", router: routes.automationRouter },
+    {
+      path: "/api/v1/automation-system",
+      router: routes.automationSystemRouter,
+    },
     { path: "/api/v1/execution-logs", router: routes.executionLogRouter },
     { path: "/api/v1/social/posts", router: routes.postRouter },
     { path: "/api/v1/social/accounts", router: routes.socialAccountRouter },

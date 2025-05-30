@@ -16,7 +16,7 @@ exports.queueService = exports.QueueService = void 0;
 const bullmq_1 = require("bullmq");
 const ioredis_1 = __importDefault(require("ioredis"));
 const redis_config_1 = require("../../config/redis.config");
-const automationExecutionService_1 = require("../automation/automationExecutionService");
+// import { automationExecutionService } from "../automation/automationExecutionService";
 // Conexión a Redis (compartida por todas las colas)
 const connection = new ioredis_1.default(redis_config_1.redisConfig);
 // Opciones de conexión para BullMQ
@@ -30,23 +30,23 @@ class QueueService {
     // Inicialización privada (patrón Singleton)
     constructor() {
         // Crear cola para ejecuciones retrasadas
-        this.delayQueue = new bullmq_1.Queue('automation-delays', queueConnectionOptions);
+        this.delayQueue = new bullmq_1.Queue("automation-delays", queueConnectionOptions);
         // Agregar eventos de conexión a Redis
-        connection.on('error', (err) => {
-            console.error('Redis connection error:', err);
+        connection.on("error", (err) => {
+            console.error("Redis connection error:", err);
         });
-        connection.on('connect', () => {
-            console.log('Successfully connected to Redis');
+        connection.on("connect", () => {
+            console.log("Successfully connected to Redis");
         });
         // Crear worker para procesar los trabajos
-        this.delayWorker = new bullmq_1.Worker('automation-delays', (job) => __awaiter(this, void 0, void 0, function* () {
+        this.delayWorker = new bullmq_1.Worker("automation-delays", (job) => __awaiter(this, void 0, void 0, function* () {
             yield this.processDelayedExecution(job);
         }), queueConnectionOptions);
         // Crear eventos para monitoreo
-        this.queueEvents = new bullmq_1.QueueEvents('automation-delays', queueConnectionOptions);
+        this.queueEvents = new bullmq_1.QueueEvents("automation-delays", queueConnectionOptions);
         // Configurar manejadores de eventos
         this.setupEventHandlers();
-        console.log('📋 Servicio de colas para automatizaciones inicializado');
+        console.log("📋 Servicio de colas para automatizaciones inicializado");
     }
     /**
      * Obtener la instancia del servicio (Singleton)
@@ -63,26 +63,26 @@ class QueueService {
     addDelayedExecution(delayMinutes, executionId, automationId, context, nextNodes, allNodes) {
         return __awaiter(this, void 0, void 0, function* () {
             try {
-                const job = yield this.delayQueue.add('delayed-execution', {
+                const job = yield this.delayQueue.add("delayed-execution", {
                     executionId,
                     automationId,
                     context,
                     nextNodes,
-                    allNodes
+                    allNodes,
                 }, {
                     delay: delayMinutes * 60 * 1000, // Convertir minutos a milisegundos
                     removeOnComplete: true, // Eliminar trabajo cuando se complete
                     attempts: 3, // Intentos en caso de fallos
                     backoff: {
-                        type: 'exponential',
-                        delay: 5000 // 5 segundos entre reintentos, aumentando exponencialmente
-                    }
+                        type: "exponential",
+                        delay: 5000, // 5 segundos entre reintentos, aumentando exponencialmente
+                    },
                 });
                 console.log(`📝 Ejecución retrasada añadida a la cola: ${job.id} (${delayMinutes} minutos)`);
                 return job.id;
             }
             catch (error) {
-                console.error('Error al añadir trabajo a la cola:', error);
+                console.error("Error al añadir trabajo a la cola:", error);
                 throw error;
             }
         });
@@ -97,18 +97,18 @@ class QueueService {
             // Registrar la finalización del delay en el contexto (por si se necesita auditar)
             context.logs.push({
                 timestamp: new Date(),
-                nodeId: context.currentNodeId || 'unknown',
-                level: 'info',
-                action: 'delay_completed',
-                message: `Retraso completado después de la cola (Job ID: ${job.id})`
+                nodeId: context.currentNodeId || "unknown",
+                level: "info",
+                action: "delay_completed",
+                message: `Retraso completado después de la cola (Job ID: ${job.id})`,
             });
             try {
                 // Verificar si tenemos todos los nodos. Si no, cargarlos desde la base de datos
                 let nodesForExecution = allNodes;
                 if (!nodesForExecution || nodesForExecution.length === 0) {
-                    console.log('No se recibieron nodos en el job, cargando desde la base de datos...');
+                    console.log("No se recibieron nodos en el job, cargando desde la base de datos...");
                     try {
-                        const AutomationModel = require('../../models/AutomationModel').default;
+                        const AutomationModel = require("../../models/AutomationModel").default;
                         const automation = yield AutomationModel.findById(automationId);
                         if (!automation) {
                             throw new Error(`Automatización no encontrada: ${automationId}`);
@@ -117,16 +117,21 @@ class QueueService {
                         console.log(`Cargados ${nodesForExecution.length} nodos desde la base de datos`);
                     }
                     catch (loadError) {
-                        console.error('Error cargando nodos desde la base de datos:', loadError);
+                        console.error("Error cargando nodos desde la base de datos:", loadError);
                         throw loadError;
                     }
                 }
                 // Procesar los nodos siguientes
                 for (const nextNodeId of nextNodes) {
-                    const nextNode = nodesForExecution.find(node => node.id === nextNodeId);
+                    const nextNode = nodesForExecution.find((node) => node.id === nextNodeId);
                     if (nextNode) {
-                        // Ejecutar el siguiente nodo en la automatización usando el método público
-                        yield automationExecutionService_1.automationExecutionService.continueExecution(nextNode, nodesForExecution, context);
+                        // TODO: Implementar ejecución de nodos después de delay
+                        // await automationExecutionService.continueExecution(
+                        //   nextNode,
+                        //   nodesForExecution,
+                        //   context
+                        // );
+                        console.log(`TODO: Ejecutar nodo ${nextNodeId} después de delay`);
                     }
                     else {
                         console.error(`❌ Nodo siguiente no encontrado: ${nextNodeId}`);
@@ -145,15 +150,15 @@ class QueueService {
      */
     setupEventHandlers() {
         // Eventos de la cola
-        this.queueEvents.on('completed', ({ jobId }) => {
+        this.queueEvents.on("completed", ({ jobId }) => {
             console.log(`✅ Trabajo completado: ${jobId}`);
         });
-        this.queueEvents.on('failed', ({ jobId, failedReason }) => {
+        this.queueEvents.on("failed", ({ jobId, failedReason }) => {
             console.error(`❌ Trabajo fallido: ${jobId}`, failedReason);
         });
         // Eventos del worker
-        this.delayWorker.on('error', err => {
-            console.error('❌ Error en worker de delays:', err);
+        this.delayWorker.on("error", (err) => {
+            console.error("❌ Error en worker de delays:", err);
         });
     }
     /**
@@ -164,7 +169,7 @@ class QueueService {
             yield this.delayWorker.close();
             yield this.delayQueue.close();
             yield this.queueEvents.close();
-            console.log('📋 Servicio de colas cerrado correctamente');
+            console.log("📋 Servicio de colas cerrado correctamente");
         });
     }
 }

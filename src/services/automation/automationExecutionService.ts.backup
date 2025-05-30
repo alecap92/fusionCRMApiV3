@@ -3,16 +3,7 @@ import mongoose from "mongoose";
 import axios, { AxiosRequestConfig } from "axios";
 import AutomationModel, {
   IAutomation,
-  AutomationNode,
-  TriggerNode,
-  HttpRequestNode,
-  ConditionNode,
-  SendEmailNode,
-  SendWhatsAppNode,
-  DelayNode,
-  TransformNode,
-  SendMassEmailNode,
-  ContactsNode,
+  IAutomationNode,
 } from "../../models/AutomationModel";
 import { EmailService } from "../email/emailService";
 import { WhatsAppService } from "../whatsapp/whatsAppService";
@@ -124,14 +115,14 @@ export class AutomationExecutionService {
    * @param context - Contexto de ejecución actual
    */
   private async executeNode(
-    node: AutomationNode,
-    allNodes: AutomationNode[],
+    node: IAutomationNode,
+    allNodes: IAutomationNode[],
     context: ExecutionContext
   ): Promise<void> {
     try {
       // Guardar la lista de todos los nodos en el contexto para que estén disponibles en callbacks
       context.allNodes = allNodes;
-      
+
       // Registrar inicio de ejecución del nodo
       this.logNodeExecution(context, node.id, "start", node.type);
 
@@ -167,7 +158,10 @@ export class AutomationExecutionService {
           break;
 
         case "delay":
-          shouldContinue = await this.executeDelayNode(node as DelayNode, context);
+          shouldContinue = await this.executeDelayNode(
+            node as DelayNode,
+            context
+          );
           break;
 
         case "transform":
@@ -178,7 +172,10 @@ export class AutomationExecutionService {
           break;
 
         case "send_mass_email":
-          await this.executeSendMassEmailNode(node as SendMassEmailNode, context);
+          await this.executeSendMassEmailNode(
+            node as SendMassEmailNode,
+            context
+          );
           break;
 
         case "contacts":
@@ -194,7 +191,9 @@ export class AutomationExecutionService {
 
       // Si el nodo indicó que la ejecución debe detenerse, no continuamos
       if (!shouldContinue) {
-        console.log(`⏸️ Deteniendo ejecución después del nodo ${node.id} de tipo ${node.type}`);
+        console.log(
+          `⏸️ Deteniendo ejecución después del nodo ${node.id} de tipo ${node.type}`
+        );
         return;
       }
 
@@ -299,7 +298,7 @@ export class AutomationExecutionService {
    */
   private async executeConditionNode(
     node: ConditionNode,
-    allNodes: AutomationNode[],
+    allNodes: IAutomationNode[],
     context: ExecutionContext
   ): Promise<void> {
     // Evaluar todas las condiciones
@@ -458,7 +457,7 @@ export class AutomationExecutionService {
   ): Promise<boolean> {
     try {
       const delayMinutes = node.delayMinutes;
-      
+
       // Registrar inicio de espera
       this.logNodeExecution(
         context,
@@ -469,21 +468,21 @@ export class AutomationExecutionService {
       );
 
       // Importar el servicio de colas dinámicamente para evitar dependencias circulares
-      const { queueService } = await import('../queue/queueService');
-      
+      const { queueService } = await import("../queue/queueService");
+
       // Guardar el ID del nodo actual en el contexto
       context.currentNodeId = node.id;
-      
+
       // Programar la continuación de la ejecución usando la cola
       const jobId = await queueService.addDelayedExecution(
         delayMinutes,
         context.executionId,
         context.automationId,
-        {...context}, // Clonar el contexto para evitar problemas de referencia
+        { ...context }, // Clonar el contexto para evitar problemas de referencia
         node.next || [],
         context.allNodes || [] // Pasar los nodos actuales en lugar de un array vacío
       );
-      
+
       // Registrar la información del job en el log
       this.logNodeExecution(
         context,
@@ -492,10 +491,9 @@ export class AutomationExecutionService {
         "delay_queued",
         `Espera programada en cola con ID: ${jobId}`
       );
-      
+
       // IMPORTANTE: Retornar false para indicar detener la ejecución
       return false;
-
     } catch (error) {
       console.error("Error al programar delay:", error);
       this.logNodeExecution(
@@ -508,7 +506,7 @@ export class AutomationExecutionService {
       throw error;
     }
   }
-  
+
   /**
    * Continúa la ejecución de una automatización después de un delay
    * Este método es llamado por el worker de la cola
@@ -517,22 +515,24 @@ export class AutomationExecutionService {
    * @param context - Contexto de ejecución
    */
   public async continueExecution(
-    node: AutomationNode,
-    allNodes: AutomationNode[],
+    node: IAutomationNode,
+    allNodes: IAutomationNode[],
     context: ExecutionContext
   ): Promise<void> {
     try {
       // Si no se proporcionaron nodos, cargarlos desde la base de datos
       let nodes = allNodes;
       if (!nodes || nodes.length === 0) {
-        const AutomationModel = require('../../models/AutomationModel').default;
+        const AutomationModel = require("../../models/AutomationModel").default;
         const automation = await AutomationModel.findById(context.automationId);
         if (!automation) {
-          throw new Error(`Automatización no encontrada: ${context.automationId}`);
+          throw new Error(
+            `Automatización no encontrada: ${context.automationId}`
+          );
         }
         nodes = automation.nodes;
       }
-      
+
       // Registrar la reanudación de la ejecución
       this.logNodeExecution(
         context,
@@ -541,10 +541,10 @@ export class AutomationExecutionService {
         "execution_resumed",
         `Reanudando ejecución después de delay`
       );
-      
+
       // Ejecutar el nodo actual
       await this.executeNode(node, nodes, context);
-      
+
       // Actualizar el log de ejecución
       await this.updateExecutionLog(context.executionId, {
         logs: context.logs,
@@ -552,7 +552,7 @@ export class AutomationExecutionService {
       });
     } catch (error) {
       console.error("Error al continuar ejecución después de delay:", error);
-      
+
       // Actualizar log de ejecución con el error
       await this.updateExecutionLog(context.executionId, {
         status: "failed",
@@ -560,7 +560,7 @@ export class AutomationExecutionService {
         completedAt: new Date(),
         logs: context.logs,
       });
-      
+
       throw error;
     }
   }
@@ -642,7 +642,7 @@ export class AutomationExecutionService {
       // Importar modelos necesarios
       const ListModel = require("../../models/ListModel").default;
       const ContactModel = require("../../models/ContactModel").default;
-      
+
       // Registrar inicio
       this.logNodeExecution(
         context,
@@ -693,7 +693,10 @@ export class AutomationExecutionService {
 
       // Preparar el asunto y cuerpo del correo
       const subject = this.replaceTemplateVariables(node.subject, context.data);
-      const baseEmailBody = this.replaceTemplateVariables(node.emailBody, context.data);
+      const baseEmailBody = this.replaceTemplateVariables(
+        node.emailBody,
+        context.data
+      );
 
       // Contador de éxito
       let successCount = 0;
@@ -703,50 +706,55 @@ export class AutomationExecutionService {
       const batchSize = 10;
       for (let i = 0; i < contacts.length; i += batchSize) {
         const batch = contacts.slice(i, i + batchSize);
-        
+
         // Procesar cada contacto en el lote en paralelo
-        await Promise.all(batch.map(async (contact:any) => {
-          try {
-            // Obtener email del contacto
-            const emailProperty = contact.properties.find(
-              (prop: any) => prop.key === "email"
-            );
-            const email = emailProperty?.value;
-            
-            if (!email) {
-              return; // Saltar contactos sin email
+        await Promise.all(
+          batch.map(async (contact: any) => {
+            try {
+              // Obtener email del contacto
+              const emailProperty = contact.properties.find(
+                (prop: any) => prop.key === "email"
+              );
+              const email = emailProperty?.value;
+
+              if (!email) {
+                return; // Saltar contactos sin email
+              }
+
+              // Personalizar el correo para este contacto
+              const personalizedEmailBody = this.personalizeEmailForContact(
+                baseEmailBody,
+                contact
+              );
+
+              // Enviar el correo
+              await this.emailService.sendEmail({
+                to: email,
+                subject,
+                html: personalizedEmailBody,
+                from: node.from || "ventas@manillasdecontrol.com", // Usar el from proporcionado o el predeterminado
+                organizationId: context.organizationId,
+              });
+
+              successCount++;
+            } catch (error) {
+              errorCount++;
+              console.error(
+                `Error enviando email a contacto ${contact._id}:`,
+                error
+              );
+
+              this.logNodeExecution(
+                context,
+                node.id,
+                "warning",
+                "email_send_error",
+                `Error al enviar email a ${contact._id}: ${error instanceof Error ? error.message : String(error)}`
+              );
             }
-            
-            // Personalizar el correo para este contacto
-            const personalizedEmailBody = this.personalizeEmailForContact(
-              baseEmailBody,
-              contact
-            );
-            
-            // Enviar el correo
-            await this.emailService.sendEmail({
-              to: email,
-              subject,
-              html: personalizedEmailBody,
-              from: node.from || "ventas@manillasdecontrol.com", // Usar el from proporcionado o el predeterminado
-              organizationId: context.organizationId,
-            });
-            
-            successCount++;
-          } catch (error) {
-            errorCount++;
-            console.error(`Error enviando email a contacto ${contact._id}:`, error);
-            
-            this.logNodeExecution(
-              context,
-              node.id,
-              "warning",
-              "email_send_error",
-              `Error al enviar email a ${contact._id}: ${error instanceof Error ? error.message : String(error)}`
-            );
-          }
-        }));
-        
+          })
+        );
+
         // Actualizar logs de progreso cada lote
         this.logNodeExecution(
           context,
@@ -765,16 +773,15 @@ export class AutomationExecutionService {
         "mass_email_completed",
         `Envío masivo completado: ${successCount} exitosos, ${errorCount} fallidos de ${contacts.length} contactos`
       );
-      
+
       // Actualizar el contexto con información del resultado
       context.data.massEmailResult = {
         totalContacts: contacts.length,
         successCount,
         errorCount,
         listId: node.listId,
-        listName: list.name
+        listName: list.name,
       };
-      
     } catch (error) {
       console.error("Error en envío masivo de emails:", error);
       throw new Error(
@@ -795,10 +802,10 @@ export class AutomationExecutionService {
     try {
       // Importar el modelo de contacto
       const ContactModel = require("../../models/ContactModel").default;
-      
+
       // Obtener la acción a realizar (create, update, delete, find)
       const action = node.action;
-      
+
       // Registrar inicio de la acción
       this.logNodeExecution(
         context,
@@ -807,7 +814,7 @@ export class AutomationExecutionService {
         `contacts_${action}_start`,
         `Iniciando ${action} de contacto`
       );
-      
+
       // Según la acción, realizar la operación correspondiente
       switch (action) {
         case "create":
@@ -816,24 +823,26 @@ export class AutomationExecutionService {
             node.contactData || {},
             context.data
           );
-          
+
           // Transformar los datos en el formato esperado por el modelo
-          const properties = Object.entries(contactData).map(([key, value]) => ({
-            key,
-            value: value || "",
-            isVisible: true
-          }));
-          
+          const properties = Object.entries(contactData).map(
+            ([key, value]) => ({
+              key,
+              value: value || "",
+              isVisible: true,
+            })
+          );
+
           // Crear el contacto
           const newContact = await ContactModel.create({
             properties,
             organizationId: context.organizationId,
-            source: "automation"
+            source: "automation",
           });
-          
+
           // Guardar el contacto creado en el contexto para usarlo en nodos posteriores
           context.data.contact = newContact;
-          
+
           // Registrar éxito de la operación
           this.logNodeExecution(
             context,
@@ -843,19 +852,19 @@ export class AutomationExecutionService {
             `Contacto creado exitosamente con ID: ${newContact._id}`
           );
           break;
-        
+
         case "update":
           // Implementación para actualizar...
           break;
-        
+
         case "delete":
           // Implementación para eliminar...
           break;
-        
+
         case "find":
           // Implementación para buscar...
           break;
-        
+
         default:
           throw new Error(`Acción no soportada: ${action}`);
       }
@@ -863,9 +872,9 @@ export class AutomationExecutionService {
       // Guardar el error en el contexto
       context.data.error = {
         message: error instanceof Error ? error.message : String(error),
-        timestamp: new Date()
+        timestamp: new Date(),
       };
-      
+
       // Registrar error
       console.error("Error en nodo contacts:", error);
       throw new Error(
@@ -879,28 +888,28 @@ export class AutomationExecutionService {
    */
   private personalizeEmailForContact(
     emailTemplate: string,
-    contact: { 
+    contact: {
       _id: string;
       properties: Array<{ key: string; value: string }>;
       [key: string]: any;
     }
   ): string {
     let personalized = emailTemplate;
-    
+
     // Crear un objeto plano con las propiedades del contacto
     const contactData: Record<string, string> = {};
     if (Array.isArray(contact.properties)) {
       contact.properties.forEach((prop: any) => {
-        contactData[prop.key] = prop.value || '';
+        contactData[prop.key] = prop.value || "";
       });
     }
-    
+
     // Reemplazar variables
     for (const [key, value] of Object.entries(contactData)) {
-      const regex = new RegExp(`{{contact.${key}}}`, 'g');
+      const regex = new RegExp(`{{contact.${key}}}`, "g");
       personalized = personalized.replace(regex, value);
     }
-    
+
     return personalized;
   }
 
@@ -1095,7 +1104,7 @@ interface ExecutionContext {
   organizationId: string;
   startTime: number;
   currentNodeId?: string;
-  allNodes?: AutomationNode[];
+  allNodes?: IAutomationNode[];
 }
 
 // Instancia singleton del servicio

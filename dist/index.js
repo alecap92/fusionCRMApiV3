@@ -81,6 +81,10 @@ const configureRoutes = (app) => {
         { path: "/api/v1/email-templates", router: routes_1.default.emailTemplatesRouter },
         { path: "/api/v1/integrations", router: routes_1.default.integrationsRouter },
         { path: "/api/v1/automations", router: routes_1.default.automationRouter },
+        {
+            path: "/api/v1/automation-system",
+            router: routes_1.default.automationSystemRouter,
+        },
         { path: "/api/v1/execution-logs", router: routes_1.default.executionLogRouter },
         { path: "/api/v1/social/posts", router: routes_1.default.postRouter },
         { path: "/api/v1/social/accounts", router: routes_1.default.socialAccountRouter },
@@ -105,6 +109,14 @@ const configureRoutes = (app) => {
             path: "/api/v1/scoring-rules",
             router: routes_1.default.scoringRulesRouter,
         },
+        {
+            path: "/api/v1/analytics",
+            router: routes_1.default.analyticsRouter,
+        },
+        {
+            path: "/api/v1/strategies",
+            router: routes_1.default.strategyRouter,
+        },
     ];
     // Rutas especiales (con o sin autenticación)
     const specialRoutes = [
@@ -128,6 +140,10 @@ const configureRoutes = (app) => {
         {
             path: "/api/v1/contact-files",
             router: routes_1.default.contactFilesRouter,
+        },
+        {
+            path: "/api/v1/conversation",
+            router: routes_1.default.conversationRouter,
         },
     ];
     // Registrar rutas protegidas

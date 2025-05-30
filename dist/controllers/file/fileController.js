@@ -101,7 +101,7 @@ const getFiles = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
             const files = yield FileModel_1.default.find({
                 organization: req.user.organizationId,
                 isVisible: isVisible,
-            });
+            }).limit(100);
             res.status(200).json(files);
             return;
         }

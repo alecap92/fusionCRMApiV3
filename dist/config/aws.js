@@ -15,10 +15,10 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.subirArchivo = void 0;
 const client_s3_1 = require("@aws-sdk/client-s3");
 // eslint-disable-next-line @typescript-eslint/no-var-requires
-const ffmpeg = require('fluent-ffmpeg');
+const ffmpeg = require("fluent-ffmpeg");
 const ffmpeg_static_1 = __importDefault(require("ffmpeg-static"));
 const stream_1 = require("stream");
-ffmpeg.setFfmpegPath(ffmpeg_static_1.default || '');
+ffmpeg.setFfmpegPath(ffmpeg_static_1.default || "");
 // Configura el cliente de S3
 const s3 = new client_s3_1.S3Client({
     region: "us-east-1",
@@ -27,6 +27,17 @@ const s3 = new client_s3_1.S3Client({
         secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY || "",
     },
 });
+// Función para limpiar nombres de archivo
+const limpiarNombreArchivo = (nombre) => {
+    return nombre
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .replace(/[^\w\s.-]/g, "")
+        .replace(/\s+/g, "_")
+        .replace(/_{2,}/g, "_")
+        .replace(/^_+|_+$/g, "")
+        .toLowerCase();
+};
 // Convierte audio/ogg a audio/mpeg (mp3)
 const convertirAudio = (mediaBuffer) => __awaiter(void 0, void 0, void 0, function* () {
     const inputStream = new stream_1.PassThrough();
@@ -34,13 +45,13 @@ const convertirAudio = (mediaBuffer) => __awaiter(void 0, void 0, void 0, functi
     const outputStream = new stream_1.PassThrough();
     const chunks = [];
     // Escucha los datos convertidos
-    outputStream.on('data', (chunk) => chunks.push(chunk));
+    outputStream.on("data", (chunk) => chunks.push(chunk));
     yield new Promise((resolve, reject) => {
         ffmpeg(inputStream)
-            .inputFormat('ogg')
-            .toFormat('mp3')
-            .on('end', resolve)
-            .on('error', reject)
+            .inputFormat("ogg")
+            .toFormat("mp3")
+            .on("end", resolve)
+            .on("error", reject)
             .pipe(outputStream, { end: true });
     });
     return Buffer.concat(chunks);
@@ -52,8 +63,11 @@ const subirArchivo = (mediaBuffer, nombre, type) => __awaiter(void 0, void 0, vo
         if (type.includes("audio/ogg")) {
             console.log("Convirtiendo archivo OGG a MP3...");
             mediaBuffer = yield convertirAudio(mediaBuffer);
-            nombre = `${nombre}.mp3`; // Concatena la extensión
+            nombre = `${limpiarNombreArchivo(nombre)}.mp3`; // Concatena la extensión
             type = "audio/mpeg"; // Actualiza el Content-Type
+        }
+        else {
+            nombre = limpiarNombreArchivo(nombre);
         }
         // Parámetros para subir a S3
         const params = {

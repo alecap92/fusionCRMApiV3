@@ -1,6 +1,7 @@
 import { Router } from "express";
 import * as conversationController from "../controllers/conversation";
 import * as pipelineController from "../controllers/conversationPipeline";
+import * as automationController from "../controllers/conversation/automationController";
 import { verifyToken } from "../middlewares/authMiddleware";
 
 const router = Router();
@@ -34,6 +35,28 @@ router.post("/:conversationId/messages", conversationController.addMessage);
 router.put(
   "/:conversationId/read",
   conversationController.markConversationAsRead
+);
+
+// Rutas para automatizaciones
+router.post(
+  "/:conversationId/automations/pause",
+  automationController.pauseAutomations
+);
+router.post(
+  "/:conversationId/automations/resume",
+  automationController.resumeAutomations
+);
+router.get(
+  "/:conversationId/automations/status",
+  automationController.getAutomationStatus
+);
+router.get(
+  "/:conversationId/automations/history",
+  automationController.getAutomationHistory
+);
+router.get(
+  "/:conversationId/automations/can-trigger",
+  automationController.canTriggerAutomation
 );
 
 export default router;

@@ -15,17 +15,22 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.getTemplatesMessages = void 0;
 const axios_1 = __importDefault(require("axios"));
 const OrganizationModel_1 = __importDefault(require("../../../models/OrganizationModel"));
+const IntegrationsModel_1 = __importDefault(require("../../../models/IntegrationsModel"));
 const getTemplatesMessages = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     if (!req.user) {
         res.status(401).json({ message: "Usuario no autenticado" });
         return;
     }
-    const { organizationId } = req.user;
+    const organizationId = req.user.organizationId;
     const organization = yield OrganizationModel_1.default.findById(organizationId);
+    const integration = yield IntegrationsModel_1.default.findOne({
+        organizationId: organizationId,
+        service: "whatsapp",
+    });
     try {
-        const response = yield axios_1.default.get(`${process.env.WHATSAPP_API_URL}/${organization === null || organization === void 0 ? void 0 : organization.settings.whatsapp.whatsAppBusinessAccountID}/message_templates`, {
+        const response = yield axios_1.default.get(`${process.env.WHATSAPP_API_URL}/${integration === null || integration === void 0 ? void 0 : integration.credentials.whatsappAccountBusinessIdentifier}/message_templates`, {
             headers: {
-                Authorization: `Bearer ${organization === null || organization === void 0 ? void 0 : organization.settings.whatsapp.accessToken}`,
+                Authorization: `Bearer ${integration === null || integration === void 0 ? void 0 : integration.credentials.accessToken}`,
             },
         });
         res.status(200).json(response.data);

@@ -1,11 +1,10 @@
 import { Request, Response } from "express";
 import mongoose from "mongoose";
 import AutomationModel, {
-  AutomationNode,
+  IAutomationNode,
   IAutomation,
-  NodeType,
 } from "../../models/AutomationModel";
-import { automationExecutionService } from "../../services/automation/automationExecutionService";
+// import { automationExecutionService } from "../../services/automation/automationExecutionService";
 
 /**
  * Manejo de errores uniforme para los controladores de automatización
@@ -198,7 +197,7 @@ const validateAutomation = (
  * @param nodes - Array de nodos del frontend
  * @returns Array de nodos procesados para almacenamiento
  */
-const processNodesFromFrontend = (nodes: any[]): AutomationNode[] => {
+const processNodesFromFrontend = (nodes: any[]): IAutomationNode[] => {
   return nodes.map((node) => {
     // Si el nodo viene en formato React Flow, extraemos la data
     if (node.data && typeof node.data === "object") {
@@ -208,7 +207,7 @@ const processNodesFromFrontend = (nodes: any[]): AutomationNode[] => {
       // Combinar con las propiedades específicas de data
       return {
         id,
-        type: type as NodeType,
+        type: type as string,
         ...node.data,
       };
     }
@@ -253,7 +252,14 @@ export const getAutomations = async (req: Request, res: Response) => {
       .select("-__v")
       .lean();
 
-    return res.status(200).json(automations);
+    // Mapear _id a id para compatibilidad con el frontend
+    const formattedAutomations = automations.map((automation) => ({
+      ...automation,
+      id: automation._id.toString(),
+      _id: undefined, // Remover _id para evitar confusión
+    }));
+
+    return res.status(200).json(formattedAutomations);
   } catch (error) {
     return handleError(res, error);
   }
@@ -290,7 +296,14 @@ export const getAutomation = async (req: Request, res: Response) => {
       return res.status(404).json({ message: "Automatización no encontrada" });
     }
 
-    return res.status(200).json(automation);
+    // Mapear _id a id para compatibilidad con el frontend
+    const formattedAutomation = {
+      ...automation,
+      id: automation._id.toString(),
+      _id: undefined, // Remover _id para evitar confusión
+    };
+
+    return res.status(200).json(formattedAutomation);
   } catch (error) {
     return handleError(res, error);
   }
@@ -348,7 +361,8 @@ export const createAutomation = async (req: Request, res: Response) => {
     // Guardar en la base de datos
     await newAutomation.save();
 
-    return res.status(201).json(newAutomation);
+    // Usar toJSON() que automáticamente convierte _id a id
+    return res.status(201).json(newAutomation.toJSON());
   } catch (error) {
     return handleError(res, error);
   }
@@ -431,7 +445,7 @@ export const updateAutomation = async (req: Request, res: Response) => {
       { new: true, runValidators: true }
     );
 
-    return res.status(200).json(updatedAutomation);
+    return res.status(200).json(updatedAutomation?.toJSON());
   } catch (error) {
     return handleError(res, error);
   }
@@ -513,7 +527,7 @@ export const toggleAutomationActive = async (req: Request, res: Response) => {
 
     return res.status(200).json({
       message: `Automatización ${automation.isActive ? "activada" : "desactivada"} correctamente`,
-      automation,
+      automation: automation.toJSON(),
     });
   } catch (error) {
     return handleError(res, error);
@@ -552,14 +566,17 @@ export const executeAutomation = async (req: Request, res: Response) => {
     }
 
     // Ejecutar la automatización usando el servicio
-    const executionId = await automationExecutionService.executeAutomation(
-      automation.toObject() as any,
-      testData,
-      new mongoose.Types.ObjectId().toString() // Generar ID para ejecución manual
-    );
+    // const executionId = await automationExecutionService.executeAutomation(
+    //   automation.toObject() as any,
+    //   testData,
+    //   new mongoose.Types.ObjectId().toString() // Generar ID para ejecución manual
+    // );
+
+    // TODO: Implementar ejecución de automatizaciones
+    const executionId = new mongoose.Types.ObjectId().toString();
 
     return res.status(202).json({
-      message: "Ejecución de automatización iniciada",
+      message: "Ejecución de automatización iniciada (simulada)",
       executionId,
       automation: {
         id: automation._id,
@@ -654,6 +671,14 @@ export const getNodeTypes = async (req: Request, res: Response) => {
             label: "Condiciones adicionales",
           },
         ],
+      },
+      {
+        type: "whatsapp_message",
+        name: "Mensaje de WhatsApp",
+        description:
+          "Inicia la automatización cuando ocurre un mensaje de WhatsApp",
+        category: "triggers",
+        configFields: [],
       },
       {
         type: "http_request",
@@ -759,17 +784,18 @@ export const getNodeTypes = async (req: Request, res: Response) => {
       {
         type: "send_mass_email",
         name: "Enviar Emails Masivos",
-        description: "Envía correos electrónicos a todos los contactos de una lista",
+        description:
+          "Envía correos electrónicos a todos los contactos de una lista",
         category: "actions",
         configFields: [
-          { 
-            name: "listId", 
-            type: "select", 
-            required: true, 
+          {
+            name: "listId",
+            type: "select",
+            required: true,
             label: "Lista de Contactos",
-            endpoint: "/api/v1/lists", 
+            endpoint: "/api/v1/lists",
             valueField: "_id",
-            labelField: "name"
+            labelField: "name",
           },
           { name: "subject", type: "text", required: true, label: "Asunto" },
           {
@@ -777,15 +803,17 @@ export const getNodeTypes = async (req: Request, res: Response) => {
             type: "richtext",
             required: true,
             label: "Contenido",
-            helpText: "Puedes usar variables como {{contact.firstName}}, {{contact.email}}, etc."
+            helpText:
+              "Puedes usar variables como {{contact.firstName}}, {{contact.email}}, etc.",
           },
           {
             name: "from",
             type: "text",
             required: false,
             label: "Remitente",
-            helpText: "Email del remitente. Si no se especifica, se usará el predeterminado."
-          }
+            helpText:
+              "Email del remitente. Si no se especifica, se usará el predeterminado.",
+          },
         ],
       },
     ];

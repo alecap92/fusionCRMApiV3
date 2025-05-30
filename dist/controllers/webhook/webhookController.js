@@ -16,7 +16,7 @@ exports.verifyWebhookById = exports.verifyWebhook = exports.handleWebhookById = 
 const mongoose_1 = __importDefault(require("mongoose"));
 const AutomationModel_1 = __importDefault(require("../../models/AutomationModel"));
 const WebhookEndpointModel_1 = __importDefault(require("../../models/WebhookEndpointModel"));
-const automationExecutionService_1 = require("../../services/automation/automationExecutionService");
+const automationExecutor_1 = require("../../services/automations/automationExecutor");
 const logger_1 = __importDefault(require("../../utils/logger"));
 /**
  * Maneja los webhooks entrantes que pueden disparar automatizaciones
@@ -46,17 +46,18 @@ const handleWebhook = (req, res) => __awaiter(void 0, void 0, void 0, function* 
                 module,
                 event,
                 secret: providedSecret,
-                isActive: true
+                isActive: true,
             });
             if (webhookEndpoint) {
                 targetOrganizationId = (_a = webhookEndpoint.organizationId) === null || _a === void 0 ? void 0 : _a.toString();
                 logger_1.default.info(`Webhook identificado por secreto: ${module}/${event}`, {
                     webhookId: (_b = webhookEndpoint._id) === null || _b === void 0 ? void 0 : _b.toString(),
-                    organizationId: targetOrganizationId
+                    organizationId: targetOrganizationId,
                 });
             }
         }
-        if (!targetOrganizationId || !mongoose_1.default.Types.ObjectId.isValid(targetOrganizationId)) {
+        if (!targetOrganizationId ||
+            !mongoose_1.default.Types.ObjectId.isValid(targetOrganizationId)) {
             return res.status(400).json({
                 message: "ID de organización válido es requerido en el header 'x-organization-id' o un secreto válido en 'x-webhook-secret'",
             });
@@ -116,8 +117,18 @@ const handleWebhook = (req, res) => __awaiter(void 0, void 0, void 0, function* 
                 }
             }
             logger_1.default.info(`Ejecutando automatización ${automation._id} por webhook`);
-            // Iniciar la ejecución y devolver el ID
-            return automationExecutionService_1.automationExecutionService.executeAutomation(automation, payload, new mongoose_1.default.Types.ObjectId().toString());
+            // Crear contexto para la ejecución del webhook
+            const context = {
+                conversationId: new mongoose_1.default.Types.ObjectId().toString(),
+                organizationId: targetOrganizationId,
+                contactNumber: "webhook_trigger",
+                lastMessage: JSON.stringify(payload),
+                variables: Object.assign(Object.assign({}, payload), { webhook_module: module, webhook_event: event, timestamp: new Date().toISOString() }),
+                isFirstMessage: false,
+            };
+            // Ejecutar la automatización con el contexto del webhook
+            automationExecutor_1.AutomationExecutor.executeAutomation(automation, context);
+            return Promise.resolve(new mongoose_1.default.Types.ObjectId().toString());
         });
         // Filtrar promesas nulas (automatizaciones que no coinciden) y ejecutar todas
         const validPromises = executionPromises.filter((p) => p !== null);
@@ -155,16 +166,18 @@ const handleWebhookById = (req, res) => __awaiter(void 0, void 0, void 0, functi
     logger_1.default.info(`Webhook recibido por ID único: ${uniqueId}`, {
         uniqueId,
         payloadSample: JSON.stringify(payload).substring(0, 200), // Muestra parte del payload para debug
-        hasSecret: !!providedSecret
+        hasSecret: !!providedSecret,
     });
     if (!uniqueId) {
-        return res.status(400).json({ message: "ID único del webhook es requerido" });
+        return res
+            .status(400)
+            .json({ message: "ID único del webhook es requerido" });
     }
     try {
         // Buscar el endpoint de webhook por su ID único
         const webhookEndpoint = yield WebhookEndpointModel_1.default.findOne({
             uniqueId,
-            isActive: true
+            isActive: true,
         });
         logger_1.default.info(`Búsqueda de webhook con uniqueId: ${uniqueId}, resultado:`, {
             encontrado: !!webhookEndpoint,
@@ -182,7 +195,7 @@ const handleWebhookById = (req, res) => __awaiter(void 0, void 0, void 0, functi
                 webhookId: (_b = webhookEndpoint._id) === null || _b === void 0 ? void 0 : _b.toString(),
             });
             return res.status(401).json({
-                message: "Secreto de webhook inválido"
+                message: "Secreto de webhook inválido",
             });
         }
         const { module, event, organizationId } = webhookEndpoint;
@@ -224,8 +237,8 @@ const handleWebhookById = (req, res) => __awaiter(void 0, void 0, void 0, functi
                 webhookInfo: {
                     module,
                     event,
-                    organizationId: organizationId === null || organizationId === void 0 ? void 0 : organizationId.toString()
-                }
+                    organizationId: organizationId === null || organizationId === void 0 ? void 0 : organizationId.toString(),
+                },
             });
         }
         // Verificar y ejecutar cada automatización que coincida
@@ -261,8 +274,18 @@ const handleWebhookById = (req, res) => __awaiter(void 0, void 0, void 0, functi
                 }
             }
             logger_1.default.info(`Ejecutando automatización ${automation._id} por webhook con ID: ${uniqueId}`);
-            // Iniciar la ejecución y devolver el ID
-            return automationExecutionService_1.automationExecutionService.executeAutomation(automation, payload, new mongoose_1.default.Types.ObjectId().toString());
+            // Crear contexto para la ejecución del webhook
+            const context = {
+                conversationId: new mongoose_1.default.Types.ObjectId().toString(),
+                organizationId: (organizationId === null || organizationId === void 0 ? void 0 : organizationId.toString()) || "",
+                contactNumber: "webhook_trigger",
+                lastMessage: JSON.stringify(payload),
+                variables: Object.assign(Object.assign({}, payload), { webhook_module: module, webhook_event: event, webhook_unique_id: uniqueId, timestamp: new Date().toISOString() }),
+                isFirstMessage: false,
+            };
+            // Ejecutar la automatización con el contexto del webhook
+            automationExecutor_1.AutomationExecutor.executeAutomation(automation, context);
+            return Promise.resolve(new mongoose_1.default.Types.ObjectId().toString());
         });
         // Filtrar promesas nulas (automatizaciones que no coinciden) y ejecutar todas
         const validPromises = executionPromises.filter((p) => p !== null);
@@ -277,7 +300,7 @@ const handleWebhookById = (req, res) => __awaiter(void 0, void 0, void 0, functi
         logger_1.default.error("Error al procesar webhook por ID", {
             error: error instanceof Error ? error.message : String(error),
             uniqueId,
-            stack: error instanceof Error ? error.stack : undefined
+            stack: error instanceof Error ? error.stack : undefined,
         });
         return res.status(500).json({
             message: "Error al procesar el webhook",
@@ -337,7 +360,9 @@ const verifyWebhookById = (req, res) => __awaiter(void 0, void 0, void 0, functi
                 return res.status(200).send(challenge);
             }
             logger_1.default.warn(`Verificación de webhook fallida para ID: ${uniqueId} - Token inválido`);
-            return res.status(401).json({ message: "Token de verificación inválido" });
+            return res
+                .status(401)
+                .json({ message: "Token de verificación inválido" });
         }
         // Si es una solicitud normal de verificación de disponibilidad
         return res.status(200).json({
@@ -345,7 +370,7 @@ const verifyWebhookById = (req, res) => __awaiter(void 0, void 0, void 0, functi
             uniqueId,
             module,
             event,
-            isActive
+            isActive,
         });
     }
     catch (error) {

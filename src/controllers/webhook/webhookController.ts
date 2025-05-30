@@ -3,7 +3,7 @@ import { Request, Response } from "express";
 import mongoose from "mongoose";
 import AutomationModel from "../../models/AutomationModel";
 import WebhookEndpointModel from "../../models/WebhookEndpointModel";
-import { automationExecutionService } from "../../services/automation/automationExecutionService";
+import { AutomationExecutor } from "../../services/automations/automationExecutor";
 import logger from "../../utils/logger";
 
 /**
@@ -30,26 +30,29 @@ export const handleWebhook = async (req: Request, res: Response) => {
 
   try {
     let targetOrganizationId = organizationId;
-    
+
     // Si se proporciona un secreto, intentar encontrar el webhook por módulo, evento y secreto
     if (providedSecret && !targetOrganizationId) {
       const webhookEndpoint = await WebhookEndpointModel.findOne({
         module,
         event,
         secret: providedSecret,
-        isActive: true
+        isActive: true,
       });
-      
+
       if (webhookEndpoint) {
         targetOrganizationId = webhookEndpoint.organizationId?.toString();
         logger.info(`Webhook identificado por secreto: ${module}/${event}`, {
           webhookId: webhookEndpoint._id?.toString(),
-          organizationId: targetOrganizationId
+          organizationId: targetOrganizationId,
         });
       }
     }
 
-    if (!targetOrganizationId || !mongoose.Types.ObjectId.isValid(targetOrganizationId)) {
+    if (
+      !targetOrganizationId ||
+      !mongoose.Types.ObjectId.isValid(targetOrganizationId)
+    ) {
       return res.status(400).json({
         message:
           "ID de organización válido es requerido en el header 'x-organization-id' o un secreto válido en 'x-webhook-secret'",
@@ -133,12 +136,24 @@ export const handleWebhook = async (req: Request, res: Response) => {
 
       logger.info(`Ejecutando automatización ${automation._id} por webhook`);
 
-      // Iniciar la ejecución y devolver el ID
-      return automationExecutionService.executeAutomation(
-        automation as any,
-        payload,
-        new mongoose.Types.ObjectId().toString()
-      );
+      // Crear contexto para la ejecución del webhook
+      const context = {
+        conversationId: new mongoose.Types.ObjectId().toString(),
+        organizationId: targetOrganizationId,
+        contactNumber: "webhook_trigger",
+        lastMessage: JSON.stringify(payload),
+        variables: {
+          ...payload,
+          webhook_module: module,
+          webhook_event: event,
+          timestamp: new Date().toISOString(),
+        },
+        isFirstMessage: false,
+      };
+
+      // Ejecutar la automatización con el contexto del webhook
+      AutomationExecutor.executeAutomation(automation as any, context);
+      return Promise.resolve(new mongoose.Types.ObjectId().toString());
     });
 
     // Filtrar promesas nulas (automatizaciones que no coinciden) y ejecutar todas
@@ -180,18 +195,20 @@ export const handleWebhookById = async (req: Request, res: Response) => {
   logger.info(`Webhook recibido por ID único: ${uniqueId}`, {
     uniqueId,
     payloadSample: JSON.stringify(payload).substring(0, 200), // Muestra parte del payload para debug
-    hasSecret: !!providedSecret
+    hasSecret: !!providedSecret,
   });
 
   if (!uniqueId) {
-    return res.status(400).json({ message: "ID único del webhook es requerido" });
+    return res
+      .status(400)
+      .json({ message: "ID único del webhook es requerido" });
   }
 
   try {
     // Buscar el endpoint de webhook por su ID único
-    const webhookEndpoint = await WebhookEndpointModel.findOne({ 
+    const webhookEndpoint = await WebhookEndpointModel.findOne({
       uniqueId,
-      isActive: true
+      isActive: true,
     });
 
     logger.info(`Búsqueda de webhook con uniqueId: ${uniqueId}, resultado:`, {
@@ -211,21 +228,24 @@ export const handleWebhookById = async (req: Request, res: Response) => {
         uniqueId,
         webhookId: webhookEndpoint._id?.toString(),
       });
-      
+
       return res.status(401).json({
-        message: "Secreto de webhook inválido"
+        message: "Secreto de webhook inválido",
       });
     }
 
     const { module, event, organizationId } = webhookEndpoint;
 
     // Loguear más información para diagnóstico
-    logger.info(`Datos del webhook encontrado: module=${module}, event=${event}, orgId=${organizationId}`, {
-      uniqueId,
-      module,
-      event,
-      organizationId: organizationId?.toString(),
-    });
+    logger.info(
+      `Datos del webhook encontrado: module=${module}, event=${event}, orgId=${organizationId}`,
+      {
+        uniqueId,
+        module,
+        event,
+        organizationId: organizationId?.toString(),
+      }
+    );
 
     // Buscar automatizaciones activas que coincidan con este módulo y evento
     const automations = await AutomationModel.find({
@@ -241,13 +261,15 @@ export const handleWebhookById = async (req: Request, res: Response) => {
     });
 
     // Loguear la consulta para diagnóstico
-    logger.info(`Consulta de automatizaciones: ${JSON.stringify({
-      organizationId: organizationId?.toString(),
-      isActive: true,
-      "nodes.type": "trigger",
-      "nodes.module": module,
-      "nodes.event": event,
-    })}`);
+    logger.info(
+      `Consulta de automatizaciones: ${JSON.stringify({
+        organizationId: organizationId?.toString(),
+        isActive: true,
+        "nodes.type": "trigger",
+        "nodes.module": module,
+        "nodes.event": event,
+      })}`
+    );
 
     logger.info(
       `Encontradas ${automations.length} automatizaciones que coinciden con webhook ${uniqueId} (${module}/${event})`,
@@ -264,8 +286,8 @@ export const handleWebhookById = async (req: Request, res: Response) => {
         webhookInfo: {
           module,
           event,
-          organizationId: organizationId?.toString()
-        }
+          organizationId: organizationId?.toString(),
+        },
       });
     }
 
@@ -316,14 +338,29 @@ export const handleWebhookById = async (req: Request, res: Response) => {
         }
       }
 
-      logger.info(`Ejecutando automatización ${automation._id} por webhook con ID: ${uniqueId}`);
-
-      // Iniciar la ejecución y devolver el ID
-      return automationExecutionService.executeAutomation(
-        automation as any,
-        payload,
-        new mongoose.Types.ObjectId().toString()
+      logger.info(
+        `Ejecutando automatización ${automation._id} por webhook con ID: ${uniqueId}`
       );
+
+      // Crear contexto para la ejecución del webhook
+      const context = {
+        conversationId: new mongoose.Types.ObjectId().toString(),
+        organizationId: organizationId?.toString() || "",
+        contactNumber: "webhook_trigger",
+        lastMessage: JSON.stringify(payload),
+        variables: {
+          ...payload,
+          webhook_module: module,
+          webhook_event: event,
+          webhook_unique_id: uniqueId,
+          timestamp: new Date().toISOString(),
+        },
+        isFirstMessage: false,
+      };
+
+      // Ejecutar la automatización con el contexto del webhook
+      AutomationExecutor.executeAutomation(automation as any, context);
+      return Promise.resolve(new mongoose.Types.ObjectId().toString());
     });
 
     // Filtrar promesas nulas (automatizaciones que no coinciden) y ejecutar todas
@@ -341,7 +378,7 @@ export const handleWebhookById = async (req: Request, res: Response) => {
     logger.error("Error al procesar webhook por ID", {
       error: error instanceof Error ? error.message : String(error),
       uniqueId,
-      stack: error instanceof Error ? error.stack : undefined
+      stack: error instanceof Error ? error.stack : undefined,
     });
 
     return res.status(500).json({
@@ -414,7 +451,9 @@ export const verifyWebhookById = async (req: Request, res: Response) => {
       logger.warn(
         `Verificación de webhook fallida para ID: ${uniqueId} - Token inválido`
       );
-      return res.status(401).json({ message: "Token de verificación inválido" });
+      return res
+        .status(401)
+        .json({ message: "Token de verificación inválido" });
     }
 
     // Si es una solicitud normal de verificación de disponibilidad
@@ -423,7 +462,7 @@ export const verifyWebhookById = async (req: Request, res: Response) => {
       uniqueId,
       module,
       event,
-      isActive
+      isActive,
     });
   } catch (error) {
     logger.error("Error al verificar webhook por ID", {

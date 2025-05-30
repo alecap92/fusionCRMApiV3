@@ -16,12 +16,12 @@ exports.markMessagesAsRead = void 0;
 const MessageModel_1 = __importDefault(require("../../../models/MessageModel"));
 const markMessagesAsRead = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     var _a;
-    const { contact } = req.body;
+    const body = req.body;
     const organizationId = (_a = req.user) === null || _a === void 0 ? void 0 : _a.organizationId;
     if (!req.user) {
         return res.status(401).json({ error: "User not authenticated" });
     }
-    if (!contact) {
+    if (!body.contact) {
         return res.status(400).json({ error: "Contact is required" });
     }
     try {
@@ -29,8 +29,7 @@ const markMessagesAsRead = (req, res) => __awaiter(void 0, void 0, void 0, funct
         const updated = yield MessageModel_1.default.updateMany({
             isRead: false,
             organization: organizationId,
-            from: contact,
-            direction: "incoming", // Solo marcar como leídos los mensajes entrantes
+            $or: [{ from: body.contact }, { to: body.contact }],
         }, { $set: { isRead: true } });
         res.status(200).json({ message: "Messages marked as read", updated });
     }

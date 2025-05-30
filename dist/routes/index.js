@@ -51,6 +51,10 @@ const productAcquisitionRouter_1 = __importDefault(require("./productAcquisition
 const documentRouter_1 = __importDefault(require("./documentRouter"));
 const contactFilesRouter_1 = __importDefault(require("./contactFilesRouter"));
 const scoringRulesRouter_1 = __importDefault(require("./scoringRulesRouter"));
+const analyticsRouter_1 = __importDefault(require("./analyticsRouter"));
+const strategyRouter_1 = __importDefault(require("./strategyRouter"));
+const conversation_routes_1 = __importDefault(require("./conversation.routes"));
+const automationSystemRouter_1 = __importDefault(require("./automationSystemRouter"));
 const routes = {
     authRouter: authRouter_1.default,
     downloadDealsRouter: downloadDealsRouter_1.default,
@@ -86,6 +90,7 @@ const routes = {
     contactsApi: contactsApi_1.default,
     dealsApi: dealsApi_1.default,
     automationRouter: automationRouter_1.default,
+    automationSystemRouter: automationSystemRouter_1.default,
     invoiceRouter: invoiceRouter_1.default,
     postRouter: postRouter_1.default,
     socialAccountRouter: socialAccountRouter_1.default,
@@ -100,5 +105,8 @@ const routes = {
     documentRouter: documentRouter_1.default,
     contactFilesRouter: contactFilesRouter_1.default,
     scoringRulesRouter: scoringRulesRouter_1.default,
+    analyticsRouter: analyticsRouter_1.default,
+    strategyRouter: strategyRouter_1.default,
+    conversationRouter: conversation_routes_1.default,
 };
 exports.default = routes;

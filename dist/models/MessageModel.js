@@ -32,5 +32,10 @@ const messageSchema = new mongoose_1.Schema({
     },
     messageId: { type: String },
     reactions: [reactionSchema],
+    conversation: {
+        type: mongoose_1.Schema.Types.ObjectId,
+        ref: "Conversation",
+        required: true,
+    },
 });
 exports.default = (0, mongoose_1.model)("Message", messageSchema);

@@ -13,6 +13,8 @@ import { getSocketInstance } from "../../../config/socket";
 import axios from "axios";
 import UserModel from "../../../models/UserModel";
 import { reopenConversationIfClosed } from "../../../services/conversations/createConversation";
+import { AutomationHelper } from "../../../utils/automationHelper";
+import { sendCustomMessage } from "./sendCustomMessage";
 
 export const handleWebhook = async (
   req: Request,
@@ -37,11 +39,20 @@ export const handleWebhook = async (
 
     // Verificar si es un webhook de status (confirmación de envío)
     if (value.statuses) {
-      console.log("Received status webhook:", value.statuses[0].errors);
-      console.log("Received status webhook:", value.statuses[0]?.status);
-      res.status(500).send({
+      // Log más silencioso para webhooks de estado
+      if (value.statuses[0].errors) {
+        console.log("Status webhook error:", value.statuses[0].errors);
+      }
+      // Solo loguear estados que no sean 'sent' o 'delivered' para reducir ruido
+      const status = value.statuses[0]?.status;
+      if (status && !["sent", "delivered"].includes(status)) {
+        console.log("Status webhook:", status);
+      }
+
+      res.status(200).send({
         message: "Status webhook received",
-        error: value.statuses[0].errors,
+        status: value.statuses[0]?.status,
+        errors: value.statuses[0].errors,
       });
       return;
     }
@@ -266,6 +277,40 @@ export const handleWebhook = async (
           message: text,
           timestamp: new Date(parseInt(timestamp) * 1000),
         });
+
+        // 🤖 NUEVA LÓGICA DE AUTOMATIZACIONES
+        try {
+          console.log(
+            `[Automatizaciones] Procesando mensaje para conversación ${conversation._id}`
+          );
+
+          // Importar el ejecutor de automatizaciones
+          const { AutomationExecutor } = await import(
+            "../../../services/automations/automationExecutor"
+          );
+
+          // Determinar si es el primer mensaje de la conversación
+          const messageCount = await MessageModel.countDocuments({
+            conversation: conversation._id,
+            direction: "incoming",
+          });
+          const isFirstMessage = messageCount === 1;
+
+          // Procesar el mensaje con el sistema de automatizaciones
+          await AutomationExecutor.processIncomingMessage(
+            (conversation._id as any).toString(),
+            organization._id.toString(),
+            from,
+            text,
+            isFirstMessage
+          );
+        } catch (error) {
+          console.error(
+            `[Automatizaciones] Error procesando automatizaciones:`,
+            error
+          );
+          // No fallar el webhook por errores de automatización
+        }
       }
     }
 

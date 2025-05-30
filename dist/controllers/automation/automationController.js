@@ -15,7 +15,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.getNodeTypes = exports.getAvailableModules = exports.executeAutomation = exports.toggleAutomationActive = exports.deleteAutomation = exports.updateAutomation = exports.createAutomation = exports.getAutomation = exports.getAutomations = void 0;
 const mongoose_1 = __importDefault(require("mongoose"));
 const AutomationModel_1 = __importDefault(require("../../models/AutomationModel"));
-const automationExecutionService_1 = require("../../services/automation/automationExecutionService");
+// import { automationExecutionService } from "../../services/automation/automationExecutionService";
 /**
  * Manejo de errores uniforme para los controladores de automatización
  * @param res - Objeto de respuesta Express
@@ -219,7 +219,9 @@ const getAutomations = (req, res) => __awaiter(void 0, void 0, void 0, function*
             .sort({ updatedAt: -1 })
             .select("-__v")
             .lean();
-        return res.status(200).json(automations);
+        // Mapear _id a id para compatibilidad con el frontend
+        const formattedAutomations = automations.map((automation) => (Object.assign(Object.assign({}, automation), { id: automation._id.toString(), _id: undefined })));
+        return res.status(200).json(formattedAutomations);
     }
     catch (error) {
         return handleError(res, error);
@@ -253,7 +255,9 @@ const getAutomation = (req, res) => __awaiter(void 0, void 0, void 0, function* 
         if (!automation) {
             return res.status(404).json({ message: "Automatización no encontrada" });
         }
-        return res.status(200).json(automation);
+        // Mapear _id a id para compatibilidad con el frontend
+        const formattedAutomation = Object.assign(Object.assign({}, automation), { id: automation._id.toString(), _id: undefined });
+        return res.status(200).json(formattedAutomation);
     }
     catch (error) {
         return handleError(res, error);
@@ -305,7 +309,8 @@ const createAutomation = (req, res) => __awaiter(void 0, void 0, void 0, functio
         });
         // Guardar en la base de datos
         yield newAutomation.save();
-        return res.status(201).json(newAutomation);
+        // Usar toJSON() que automáticamente convierte _id a id
+        return res.status(201).json(newAutomation.toJSON());
     }
     catch (error) {
         return handleError(res, error);
@@ -372,7 +377,7 @@ const updateAutomation = (req, res) => __awaiter(void 0, void 0, void 0, functio
         }
         // Actualizar la automatización
         const updatedAutomation = yield AutomationModel_1.default.findOneAndUpdate({ _id: id, organizationId }, updateData, { new: true, runValidators: true });
-        return res.status(200).json(updatedAutomation);
+        return res.status(200).json(updatedAutomation === null || updatedAutomation === void 0 ? void 0 : updatedAutomation.toJSON());
     }
     catch (error) {
         return handleError(res, error);
@@ -446,7 +451,7 @@ const toggleAutomationActive = (req, res) => __awaiter(void 0, void 0, void 0, f
         yield automation.save();
         return res.status(200).json({
             message: `Automatización ${automation.isActive ? "activada" : "desactivada"} correctamente`,
-            automation,
+            automation: automation.toJSON(),
         });
     }
     catch (error) {
@@ -482,10 +487,15 @@ const executeAutomation = (req, res) => __awaiter(void 0, void 0, void 0, functi
             return res.status(404).json({ message: "Automatización no encontrada" });
         }
         // Ejecutar la automatización usando el servicio
-        const executionId = yield automationExecutionService_1.automationExecutionService.executeAutomation(automation.toObject(), testData, new mongoose_1.default.Types.ObjectId().toString() // Generar ID para ejecución manual
-        );
+        // const executionId = await automationExecutionService.executeAutomation(
+        //   automation.toObject() as any,
+        //   testData,
+        //   new mongoose.Types.ObjectId().toString() // Generar ID para ejecución manual
+        // );
+        // TODO: Implementar ejecución de automatizaciones
+        const executionId = new mongoose_1.default.Types.ObjectId().toString();
         return res.status(202).json({
-            message: "Ejecución de automatización iniciada",
+            message: "Ejecución de automatización iniciada (simulada)",
             executionId,
             automation: {
                 id: automation._id,
@@ -693,7 +703,7 @@ const getNodeTypes = (req, res) => __awaiter(void 0, void 0, void 0, function* (
                         label: "Lista de Contactos",
                         endpoint: "/api/v1/lists",
                         valueField: "_id",
-                        labelField: "name"
+                        labelField: "name",
                     },
                     { name: "subject", type: "text", required: true, label: "Asunto" },
                     {
@@ -701,15 +711,15 @@ const getNodeTypes = (req, res) => __awaiter(void 0, void 0, void 0, function* (
                         type: "richtext",
                         required: true,
                         label: "Contenido",
-                        helpText: "Puedes usar variables como {{contact.firstName}}, {{contact.email}}, etc."
+                        helpText: "Puedes usar variables como {{contact.firstName}}, {{contact.email}}, etc.",
                     },
                     {
                         name: "from",
                         type: "text",
                         required: false,
                         label: "Remitente",
-                        helpText: "Email del remitente. Si no se especifica, se usará el predeterminado."
-                    }
+                        helpText: "Email del remitente. Si no se especifica, se usará el predeterminado.",
+                    },
                 ],
             },
         ];

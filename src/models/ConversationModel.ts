@@ -16,6 +16,19 @@ interface IMetadata {
   value: any;
 }
 
+interface IAutomationSettings {
+  isPaused: boolean;
+  pausedUntil?: Date;
+  pausedBy?: Schema.Types.ObjectId; // Usuario que pausó las automatizaciones
+  pauseReason?: string; // "30m", "1h", "3h", "6h", "12h", "1d", "forever"
+  lastAutomationTriggered?: Date; // Para evitar disparos múltiples
+  automationHistory: Array<{
+    automationType: string; // "greeting", "follow_up", "reminder", etc.
+    triggeredAt: Date;
+    triggeredBy?: Schema.Types.ObjectId; // Usuario o "system"
+  }>;
+}
+
 interface IConversation extends Document {
   title: string;
   organization: Schema.Types.ObjectId;
@@ -32,6 +45,7 @@ interface IConversation extends Document {
   firstContactTimestamp: Date;
   metadata: IMetadata[];
   isArchived: boolean;
+  automationSettings: IAutomationSettings;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -53,6 +67,24 @@ const participantSchema = new Schema<IParticipant>({
 const metadataSchema = new Schema<IMetadata>({
   key: { type: String, required: true },
   value: { type: Schema.Types.Mixed, required: true },
+});
+
+const automationHistorySchema = new Schema({
+  automationType: { type: String, required: true },
+  triggeredAt: { type: Date, required: true, default: Date.now },
+  triggeredBy: { type: Schema.Types.ObjectId, ref: "User" },
+});
+
+const automationSettingsSchema = new Schema<IAutomationSettings>({
+  isPaused: { type: Boolean, default: false },
+  pausedUntil: { type: Date },
+  pausedBy: { type: Schema.Types.ObjectId, ref: "User" },
+  pauseReason: {
+    type: String,
+    enum: ["30m", "1h", "3h", "6h", "12h", "1d", "forever"],
+  },
+  lastAutomationTriggered: { type: Date },
+  automationHistory: [automationHistorySchema],
 });
 
 const conversationSchema = new Schema<IConversation>(
@@ -90,6 +122,13 @@ const conversationSchema = new Schema<IConversation>(
     firstContactTimestamp: { type: Date },
     metadata: [metadataSchema],
     isArchived: { type: Boolean, default: false },
+    automationSettings: {
+      type: automationSettingsSchema,
+      default: () => ({
+        isPaused: false,
+        automationHistory: [],
+      }),
+    },
   },
   { timestamps: true }
 );
@@ -102,5 +141,8 @@ conversationSchema.index({ lastMessageTimestamp: -1 });
 conversationSchema.index({ isResolved: 1 });
 conversationSchema.index({ tags: 1 });
 conversationSchema.index({ leadScore: -1 });
+// Nuevos índices para automatizaciones
+conversationSchema.index({ "automationSettings.isPaused": 1 });
+conversationSchema.index({ "automationSettings.pausedUntil": 1 });
 
 export default model<IConversation>("Conversation", conversationSchema);

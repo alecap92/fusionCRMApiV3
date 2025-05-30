@@ -1,246 +1,278 @@
-import { Schema, model, Document, Types } from "mongoose";
+import mongoose, { Schema, Document } from "mongoose";
 
-// Tipos de nodos
-export type NodeType =
-  | "trigger"
-  | "http_request"
-  | "condition"
-  | "send_email"
-  | "send_whatsapp"
-  | "delay"
-  | "transform"
-  | "send_mass_email"
-  | "contacts";
-
-// Tipos de operadores para condiciones
-export type ConditionOperator =
-  | "exists"
-  | "equals"
-  | "not_equals"
-  | "gt"
-  | "lt"
-  | "contains";
-
-// Estructura de una condición
-export interface IAutomationCondition {
-  field: string;
-  operator: ConditionOperator;
-  value?: any;
-}
-
-// Interfaz base para todos los nodos
-export interface BaseNode {
+export interface IAutomationNode {
   id: string;
-  type: NodeType;
-}
-
-// Nodo Trigger
-export interface TriggerNode extends BaseNode {
-  type: "trigger";
+  type: "trigger" | "action" | "condition" | "delay";
   module: string;
-  event: string;
-  payloadMatch?: Record<string, any>;
-  next: string[];
-}
-
-// Nodo HTTP Request
-export interface HttpRequestNode extends BaseNode {
-  type: "http_request";
-  method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
-  url: string;
-  headers?: Record<string, string>;
-  body?: Record<string, any>;
-  next: string[];
-}
-
-// Nodo Condition
-export interface ConditionNode extends BaseNode {
-  type: "condition";
-  conditions: IAutomationCondition[];
-  trueNext: string[];
-  falseNext: string[];
-}
-
-// Nodo Send Email
-export interface SendEmailNode extends BaseNode {
-  type: "send_email";
-  to: string;
-  subject: string;
-  emailBody: string;
+  event?: string;
+  data?: {
+    message?: string;
+    delay?: number;
+    delayType?: string;
+    to?: string;
+    subject?: string;
+    emailBody?: string;
+    url?: string;
+    method?: string;
+    headers?: any;
+    body?: any;
+    condition?: {
+      field: string;
+      operator:
+        | "equals"
+        | "contains"
+        | "starts_with"
+        | "ends_with"
+        | "regex"
+        | "not_equals"
+        | "greater_than"
+        | "less_than";
+      value: string;
+    };
+    payloadMatch?: any;
+    webhookId?: string;
+    keywords?: string[];
+  };
   next?: string[];
-  from?: string;
+  trueBranch?: string;
+  falseBranch?: string;
+  // Campos para compatibilidad con ReactFlow
+  position?: {
+    x: number;
+    y: number;
+  };
+  selected?: boolean;
+  dragging?: boolean;
+  // Propiedad para matching de payload en webhooks
+  payloadMatch?: any;
 }
 
-// Nodo Send WhatsApp
-export interface SendWhatsAppNode extends BaseNode {
-  type: "send_whatsapp";
-  to: string;
-  message: string;
-  next?: string[];
-}
-
-// Nodo Delay
-export interface DelayNode extends BaseNode {
-  type: "delay";
-  delayMinutes: number;
-  next: string[];
-}
-
-// Nodo Transform
-export interface TransformNode extends BaseNode {
-  type: "transform";
-  transformations: Array<{
-    outputField: string;
-    expression: string;
+export interface IAutomation extends Document {
+  name: string;
+  description?: string;
+  organizationId: mongoose.Types.ObjectId;
+  isActive: boolean;
+  nodes: IAutomationNode[];
+  // Campo para compatibilidad con sistema visual
+  edges?: Array<{
+    id: string;
+    source: string;
+    target: string;
+    type?: string;
   }>;
-  next: string[];
-}
-
-// Nodo Send Mass Email
-export interface SendMassEmailNode extends BaseNode {
-  type: "send_mass_email";
-  listId: string;         // ID de la lista de contactos
-  subject: string;        // Asunto del correo
-  emailBody: string;      // Cuerpo del correo (puede contener variables)
-  from?: string;          // Remitente (opcional, si no se proporciona se usará el predeterminado)
-  next?: string[];        // Referencias a los siguientes nodos
-}
-
-// Nodo Contacts
-export interface ContactsNode extends BaseNode {
-  type: "contacts";
-  action: "create" | "update" | "delete" | "find";
-  contactData?: Record<string, any>;  // Datos del contacto para crear o actualizar
-  contactId?: string;                // ID del contacto para actualizar o eliminar
-  next?: string[];                   // Referencias a los siguientes nodos
-}
-
-// Unión de todos los tipos de nodos
-export type AutomationNode =
-  | TriggerNode
-  | HttpRequestNode
-  | ConditionNode
-  | SendEmailNode
-  | SendWhatsAppNode
-  | DelayNode
-  | TransformNode
-  | SendMassEmailNode
-  | ContactsNode;
-
-// Interfaz para el documento de Mongoose
-export interface IAutomationDocument extends Document {
-  createdBy: Types.ObjectId;
-  organizationId: Types.ObjectId;
-  name: string;
-  description?: string;
-  isActive: boolean;
-  nodes: any[]; // Usamos any[] para el tipo interno de Mongoose
+  triggerType:
+    | "message_received"
+    | "conversation_started"
+    | "keyword"
+    | "scheduled"
+    | "webhook"
+    | "deal"
+    | "contact"
+    | "task"
+    | "manual"
+    | "whatsapp_message";
+  triggerConditions?: {
+    keywords?: string[];
+    patterns?: string[];
+    webhookId?: string;
+    dealStatus?: {
+      from?: string;
+      to?: string;
+    };
+  };
+  conversationSettings?: {
+    pauseOnUserReply?: boolean;
+    maxMessagesPerSession?: number;
+    sessionTimeout?: number; // minutos
+  };
+  // Campos para el sistema visual
+  automationType?: "workflow" | "conversation"; // workflow = visual, conversation = WhatsApp
+  status?: "active" | "inactive" | "draft";
+  lastRun?: Date;
+  runsCount?: number;
+  createdBy: mongoose.Types.ObjectId;
+  updatedBy?: mongoose.Types.ObjectId;
+  stats?: {
+    totalExecutions: number;
+    successfulExecutions: number;
+    failedExecutions: number;
+    lastExecutedAt?: Date;
+  };
   createdAt: Date;
   updatedAt: Date;
 }
 
-// Interfaz para el modelo (con tipado correcto para los nodos)
-export interface IAutomation {
-  _id?: Types.ObjectId;
-  createdBy: Types.ObjectId;
-  organizationId: Types.ObjectId;
-  name: string;
-  description?: string;
-  isActive: boolean;
-  nodes: AutomationNode[];
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-// Esquema de Mongoose
-const automationSchema = new Schema<IAutomationDocument>(
-  {
-    createdBy: {
-      type: Schema.Types.ObjectId,
-      ref: "User",
-      required: true,
+const AutomationNodeSchema = new Schema({
+  id: { type: String, required: true },
+  type: {
+    type: String,
+    enum: ["trigger", "action", "condition", "delay"],
+    required: true,
+  },
+  module: { type: String, required: true },
+  event: { type: String },
+  data: {
+    message: { type: String },
+    delay: { type: Number },
+    delayType: { type: String },
+    to: { type: String },
+    subject: { type: String },
+    emailBody: { type: String },
+    url: { type: String },
+    method: { type: String },
+    headers: { type: Schema.Types.Mixed },
+    body: { type: Schema.Types.Mixed },
+    condition: {
+      field: { type: String },
+      operator: {
+        type: String,
+        enum: [
+          "equals",
+          "contains",
+          "starts_with",
+          "ends_with",
+          "regex",
+          "not_equals",
+          "greater_than",
+          "less_than",
+        ],
+      },
+      value: { type: String },
     },
+    payloadMatch: { type: Schema.Types.Mixed },
+    webhookId: { type: String },
+    keywords: [{ type: String }],
+  },
+  next: [{ type: String }],
+  trueBranch: { type: String },
+  falseBranch: { type: String },
+  position: {
+    x: { type: Number },
+    y: { type: Number },
+  },
+  selected: { type: Boolean },
+  dragging: { type: Boolean },
+  payloadMatch: { type: Schema.Types.Mixed },
+});
+
+const EdgeSchema = new Schema({
+  id: { type: String, required: true },
+  source: { type: String, required: true },
+  target: { type: String, required: true },
+  type: { type: String },
+});
+
+const AutomationSchema = new Schema<IAutomation>(
+  {
+    name: { type: String, required: true },
+    description: { type: String },
     organizationId: {
       type: Schema.Types.ObjectId,
       ref: "Organization",
       required: true,
     },
-    name: {
+    isActive: { type: Boolean, default: false },
+    nodes: [AutomationNodeSchema],
+    edges: [EdgeSchema],
+    triggerType: {
       type: String,
+      enum: [
+        "message_received",
+        "conversation_started",
+        "keyword",
+        "scheduled",
+        "webhook",
+        "deal",
+        "contact",
+        "task",
+        "manual",
+        "whatsapp_message",
+      ],
       required: true,
-      trim: true,
     },
-    description: {
+    triggerConditions: {
+      keywords: [{ type: String }],
+      patterns: [{ type: String }],
+      webhookId: { type: String },
+      dealStatus: {
+        from: { type: String },
+        to: { type: String },
+      },
+    },
+    conversationSettings: {
+      pauseOnUserReply: { type: Boolean, default: true },
+      maxMessagesPerSession: { type: Number, default: 10 },
+      sessionTimeout: { type: Number, default: 30 }, // minutos
+    },
+    automationType: {
       type: String,
-      trim: true,
+      enum: ["workflow", "conversation"],
+      default: "workflow",
     },
-    isActive: {
-      type: Boolean,
-      default: false,
+    status: {
+      type: String,
+      enum: ["active", "inactive", "draft"],
+      default: "inactive",
     },
-    nodes: {
-      type: [Object], // Usamos Object en lugar de Schema.Types.Mixed[]
+    lastRun: { type: Date },
+    runsCount: { type: Number, default: 0 },
+    createdBy: {
+      type: Schema.Types.ObjectId,
+      ref: "User",
       required: true,
-      default: [],
+    },
+    updatedBy: {
+      type: Schema.Types.ObjectId,
+      ref: "User",
+    },
+    stats: {
+      totalExecutions: { type: Number, default: 0 },
+      successfulExecutions: { type: Number, default: 0 },
+      failedExecutions: { type: Number, default: 0 },
+      lastExecutedAt: { type: Date },
     },
   },
-  { timestamps: true }
+  {
+    timestamps: true,
+  }
 );
 
-// Validaciones
-automationSchema.pre("save", function (next) {
-  const automation = this as IAutomationDocument;
-  const nodes = automation.nodes as unknown as AutomationNode[];
+// Índices para búsqueda eficiente
+AutomationSchema.index({ organizationId: 1, isActive: 1 });
+AutomationSchema.index({ triggerType: 1, isActive: 1 });
+AutomationSchema.index({ "triggerConditions.keywords": 1 });
+AutomationSchema.index({ automationType: 1, organizationId: 1 });
 
-  // Validar que haya al menos un nodo trigger
-  const hasTrigger = nodes.some((node) => node.type === "trigger");
-  if (!hasTrigger && nodes.length > 0) {
-    return next(
-      new Error("La automatización debe tener al menos un nodo trigger")
-    );
+// Método para determinar el tipo de trigger basado en los nodos
+AutomationSchema.methods.detectTriggerType = function () {
+  const triggerNode = this.nodes.find(
+    (node: IAutomationNode) => node.type === "trigger"
+  );
+  if (!triggerNode) return "manual";
+
+  // Mapear módulos a tipos de trigger
+  if (triggerNode.module === "whatsapp") {
+    if (triggerNode.event === "conversation_started")
+      return "conversation_started";
+    if (triggerNode.event === "keyword") return "keyword";
+    if (triggerNode.event === "whatsapp_message") return "whatsapp_message";
+    return "message_received";
   }
 
-  // Validar conexiones entre nodos
-  const nodeIds = new Set(nodes.map((node) => node.id));
+  if (triggerNode.module === "webhook") return "webhook";
+  if (triggerNode.module === "deal" || triggerNode.module === "deals")
+    return "deal";
+  if (triggerNode.module === "contact" || triggerNode.module === "contacts")
+    return "contact";
+  if (triggerNode.module === "task" || triggerNode.module === "tasks")
+    return "task";
 
-  for (const node of nodes) {
-    // Verificar conexiones next
-    if ("next" in node && node.next) {
-      for (const nextId of node.next) {
-        if (!nodeIds.has(nextId)) {
-          return next(
-            new Error(
-              `El nodo ${node.id} hace referencia a un nodo inexistente ${nextId}`
-            )
-          );
-        }
-      }
-    }
+  return "manual";
+};
 
-    // Verificar conexiones de nodos de condición
-    if (node.type === "condition") {
-      const conditionNode = node as ConditionNode;
-      for (const nextId of [
-        ...conditionNode.trueNext,
-        ...conditionNode.falseNext,
-      ]) {
-        if (!nodeIds.has(nextId)) {
-          return next(
-            new Error(
-              `El nodo de condición ${node.id} hace referencia a un nodo inexistente ${nextId}`
-            )
-          );
-        }
-      }
-    }
-  }
-
-  next();
-});
-
-const AutomationModel = model<IAutomationDocument>(
+const AutomationModel = mongoose.model<IAutomation>(
   "Automation",
-  automationSchema
+  AutomationSchema
 );
 
 export default AutomationModel;
