@@ -7,12 +7,10 @@ import {
   deleteAutomation,
   toggleAutomationActive,
   executeAutomation,
+  getAvailableModules,
 } from "../controllers/automation/automationController";
 
-import {
-  getNodeTypes,
-  getAvailableModules,
-} from "../controllers/automation/nodeTypesController";
+import { getNodeTypes } from "../controllers/automation/nodeTypesController";
 
 const router: Router = Router();
 

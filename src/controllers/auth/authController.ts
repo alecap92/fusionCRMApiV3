@@ -86,6 +86,10 @@ export const register = async (req: Request, res: Response) => {
       firstName: form.firstName,
       lastName: form.lastName,
       mobile: form.phone, // o unifica todo a "phone"
+      emailSettings: {
+        emailAddress: form.email, // Usar el email del registro como emailAddress por defecto
+        // Los demás campos usarán los valores por defecto del modelo
+      },
     });
     await newUser.save();
 
@@ -94,10 +98,7 @@ export const register = async (req: Request, res: Response) => {
       companyName: "", // Cambiar si quieres forzar un nombre
       employees: [newUser._id],
       phone: newUser.mobile,
-      contactProperties: {
-        properties: {},
-        columnas: {},
-      },
+      // Remover contactProperties para que use los valores por defecto del modelo
     });
     await newOrganization.save();
 
