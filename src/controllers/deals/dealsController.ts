@@ -26,7 +26,7 @@ export const getDeals = async (req: Request, res: Response) => {
   }
 
   const { organizationId } = req.user;
-  const { pipelineId, name } = req.query;
+  const { pipelineId, name, page = 1, limit = 20 } = req.query;
 
   const filterDates = req.query.filterDates as any;
 
@@ -58,10 +58,20 @@ export const getDeals = async (req: Request, res: Response) => {
       query.title = { $regex: name, $options: "i" };
     }
 
+    // Calcular skip para paginación
+    const pageNum = parseInt(page as string);
+    const limitNum = parseInt(limit as string);
+    const skip = (pageNum - 1) * limitNum;
+
+    // Obtener el total de documentos para calcular totalPages
+    const total = await Deals.countDocuments(query);
+
     const deals = await Deals.find(query)
       .populate("associatedContactId")
       .populate("status")
       .sort({ closingDate: -1 })
+      .skip(skip)
+      .limit(limitNum)
       .exec();
 
     const dealsFields = await DealsFieldsValues.find({
@@ -93,7 +103,16 @@ export const getDeals = async (req: Request, res: Response) => {
       };
     });
 
-    res.status(200).json(dealsToSend);
+    // Respuesta con información de paginación
+    res.status(200).json({
+      data: dealsToSend,
+      total,
+      page: pageNum,
+      limit: limitNum,
+      totalPages: Math.ceil(total / limitNum),
+      hasNextPage: pageNum < Math.ceil(total / limitNum),
+      hasPrevPage: pageNum > 1,
+    });
   } catch (error) {
     console.error("Error obteniendo los tratos:", error);
     res.status(500).json({ message: "Error en el servidor" });
