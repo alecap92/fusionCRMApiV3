@@ -150,3 +150,51 @@ export const uploadLogo = async (req: Request, res: Response) => {
     return res.status(500).json({ error: "Error interno del servidor" });
   }
 };
+
+export const uploadIcon = async (req: Request, res: Response) => {
+  try {
+    const organizationId = req.user?.organizationId;
+
+    if (!organizationId) {
+      return res
+        .status(400)
+        .json({ error: "No se proporcionó el ID de la organización" });
+    }
+
+    if (!req.file) {
+      return res
+        .status(400)
+        .json({ error: "No se proporcionó un archivo para subir" });
+    }
+
+    // Subir el archivo a Cloudinary usando el buffer
+    const result = await new Promise<UploadApiResponse>((resolve, reject) => {
+      const uploadStream = cloudinary.uploader.upload_stream(
+        { folder: "organization_icons" },
+        (
+          error: UploadApiErrorResponse | null,
+          result: UploadApiResponse | undefined
+        ) => {
+          if (error) reject(error);
+          else resolve(result!);
+        }
+      );
+      uploadStream.end(req.file?.buffer);
+    });
+
+    const updatedOrganization = await Organization.findByIdAndUpdate(
+      { _id: organizationId },
+      { iconUrl: result.secure_url },
+      { new: true }
+    );
+
+    return res.status(200).json({
+      message: "Icono actualizado con éxito",
+      iconUrl: result.secure_url,
+      organization: updatedOrganization,
+    });
+  } catch (error) {
+    console.error("Error al subir el icono:", error);
+    return res.status(500).json({ error: "Error interno del servidor" });
+  }
+};

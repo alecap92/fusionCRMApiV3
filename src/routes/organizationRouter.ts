@@ -4,6 +4,7 @@ import {
   updateOrganization,
   getOrganizationById,
   uploadLogo,
+  uploadIcon,
 } from "../controllers/organizations/organizationController";
 import multer from "multer";
 
@@ -14,6 +15,7 @@ const upload = multer({ storage });
 router.get("/", getOrganization);
 router.get("/:id", getOrganizationById);
 router.put("/", updateOrganization);
-router.post("/uploadLogo", upload.single("logo"), uploadLogo);
+router.post("/upload-logo", upload.single("logo"), uploadLogo);
+router.post("/upload-icon", upload.single("icon"), uploadIcon);
 
 export default router;

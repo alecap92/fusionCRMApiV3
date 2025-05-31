@@ -64,6 +64,7 @@ export interface IOrganization extends Document {
   contactProperties: IContactProperty[];
   _id: string;
   logoUrl: string;
+  iconUrl: string;
   createdAt: Date;
   updatedAt: Date;
   idType: string;
@@ -150,6 +151,9 @@ const organizationSchema = new Schema<IOrganization>({
     type: String,
   },
   logoUrl: {
+    type: String,
+  },
+  iconUrl: {
     type: String,
   },
 
