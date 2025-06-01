@@ -184,8 +184,16 @@ export const refreshToken = async (req: IAuthRequest, res: Response) => {
       return res.status(401).json({ message: "Token no válido o expirado" });
     }
 
-    const { _id, email, firstName, lastName, mobile, organizationId, role } =
-      req.user;
+    const {
+      _id,
+      email,
+      firstName,
+      lastName,
+      mobile,
+      organizationId,
+      role,
+      rememberMe,
+    } = req.user;
 
     // Buscar usuario para confirmar que sigue existiendo
     const user = await UserModel.findById(_id, {
@@ -208,7 +216,13 @@ export const refreshToken = async (req: IAuthRequest, res: Response) => {
       return res.status(404).json({ message: "Organización no encontrada" });
     }
 
-    // Generar un nuevo token con los mismos datos pero nueva expiración
+    // Agregar organizationId al objeto user antes de devolverlo
+    const userWithOrganizationId = {
+      ...user.toObject(),
+      organizationId: organizationId || organization._id.toString(),
+    };
+
+    // Generar un nuevo token manteniendo la configuración original de rememberMe
     const newToken = generateToken({
       _id,
       email,
@@ -217,13 +231,13 @@ export const refreshToken = async (req: IAuthRequest, res: Response) => {
       mobile,
       organizationId,
       role: role || "",
-      rememberMe: true, // Mantener el token de larga duración
+      rememberMe: rememberMe || false, // Mantener la configuración original
     });
 
     // Respuesta con nuevo token, datos del usuario y organización
     return res.status(200).json({
       token: newToken,
-      user,
+      user: userWithOrganizationId,
       organization,
     });
   } catch (error) {

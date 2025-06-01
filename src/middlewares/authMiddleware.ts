@@ -24,8 +24,10 @@ export const generateToken = (
     role: user.role || "",
   };
 
-  // Ajusta la expiración si "rememberMe" es true
-  const expiresIn = rememberMe ? "30d" : "30d";
+  // Ajustar la expiración según "rememberMe"
+  // Si rememberMe es true: 30 días
+  // Si rememberMe es false: 24 horas
+  const expiresIn = rememberMe ? "30d" : "24h";
   const token = jwt.sign(payload, secretKey, { expiresIn });
 
   return token;
