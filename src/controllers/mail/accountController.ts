@@ -99,3 +99,50 @@ export const validateAccount = async (req: Request, res: Response) => {
     res.status(500).json({ error: "Failed to validate account settings." });
   }
 };
+
+/**
+ * Obtiene la configuración de email del usuario autenticado.
+ */
+export const getAccountSettings = async (req: Request, res: Response) => {
+  try {
+    const userId = req.user?._id;
+
+    if (!userId) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    const user = await UserModel.findById(userId).select("emailSettings");
+
+    if (!user || !user.emailSettings) {
+      return res.status(404).json({
+        message: "No email settings found for this user.",
+        emailSettings: null,
+      });
+    }
+
+    // Retornar configuraciones sin las contraseñas por seguridad
+    const safeSettings = {
+      emailAddress: user.emailSettings.emailAddress,
+      imapSettings: {
+        host: user.emailSettings.imapSettings.host,
+        port: user.emailSettings.imapSettings.port,
+        user: user.emailSettings.imapSettings.user,
+        tls: user.emailSettings.imapSettings.tls,
+        lastUID: user.emailSettings.imapSettings.lastUID,
+        // password omitida por seguridad
+      },
+      smtpSettings: {
+        host: user.emailSettings.smtpSettings.host,
+        port: user.emailSettings.smtpSettings.port,
+        user: user.emailSettings.smtpSettings.user,
+        secure: user.emailSettings.smtpSettings.secure,
+        // password omitida por seguridad
+      },
+    };
+
+    res.status(200).json(safeSettings);
+  } catch (error: any) {
+    console.error("Error getting account settings:", error.message || error);
+    res.status(500).json({ error: "Failed to get account settings." });
+  }
+};

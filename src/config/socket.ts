@@ -36,6 +36,7 @@ const CONFIG = {
     DISCONNECT: "disconnect",
     NEW_NOTIFICATION: "newNotification",
     NEW_MESSAGE: "newMessage",
+    NEW_EMAIL: "newEmail",
     SUBSCRIBE_CONVERSATION: "subscribe_conversation",
     UNSUBSCRIBE_CONVERSATION: "unsubscribe_conversation",
     MESSAGE_STATUS: "message_status",
@@ -98,17 +99,25 @@ const authenticateSocket = (socket: Socket): boolean => {
 const handleSocketRooms = (socket: SocketWithUser): void => {
   const { user } = socket.data;
 
+  // Obtener el ID del usuario del token (puede ser 'id' o '_id')
+  const userId = user.id || user._id;
+
   // Unir a sala de organización
   if (user.organizationId) {
     const orgRoom = `${CONFIG.ROOM_PREFIX.ORGANIZATION}${user.organizationId}`;
     socket.join(orgRoom);
-    console.log(`Socket ${socket.id} joined room: ${orgRoom}`);
   }
 
-  // Unir a sala personal
-  const userRoom = `${CONFIG.ROOM_PREFIX.USER}${user.id}`;
-  socket.join(userRoom);
-  console.log(`Socket ${socket.id} joined room: ${userRoom}`);
+  // Unir a sala personal - usar el ID correcto
+  if (userId) {
+    const userRoom = `${CONFIG.ROOM_PREFIX.USER}${userId}`;
+    socket.join(userRoom);
+  } else {
+    console.error(
+      `❌ No se pudo obtener userId para socket ${socket.id}:`,
+      user
+    );
+  }
 };
 
 /**
@@ -118,7 +127,7 @@ const handleSocketRooms = (socket: SocketWithUser): void => {
 const setupSocketEvents = (socket: SocketWithUser): void => {
   // Evento de desconexión
   socket.on(CONFIG.EVENTS.DISCONNECT, () => {
-    console.log(`Socket ${socket.id} disconnected`);
+    // Socket desconectado
   });
 
   // Unirse a sala
@@ -128,7 +137,6 @@ const setupSocketEvents = (socket: SocketWithUser): void => {
     }
 
     socket.join(room);
-    console.log(`Socket ${socket.id} joined room: ${room}`);
   });
 
   // Salir de sala
@@ -138,7 +146,6 @@ const setupSocketEvents = (socket: SocketWithUser): void => {
     }
 
     socket.leave(room);
-    console.log(`Socket ${socket.id} left room: ${room}`);
   });
 
   // Suscribirse a una conversación
@@ -149,9 +156,6 @@ const setupSocketEvents = (socket: SocketWithUser): void => {
 
     const conversationRoom = `conversation_${conversationId}`;
     socket.join(conversationRoom);
-    console.log(
-      `Socket ${socket.id} subscribed to conversation: ${conversationId}`
-    );
   });
 
   // Desuscribirse de una conversación
@@ -164,9 +168,6 @@ const setupSocketEvents = (socket: SocketWithUser): void => {
 
       const conversationRoom = `conversation_${conversationId}`;
       socket.leave(conversationRoom);
-      console.log(
-        `Socket ${socket.id} unsubscribed from conversation: ${conversationId}`
-      );
     }
   );
 };
@@ -176,8 +177,6 @@ const setupSocketEvents = (socket: SocketWithUser): void => {
  * @param socket Nuevo socket conectado
  */
 const handleNewConnection = (socket: Socket): void => {
-  console.log(`New socket connection: ${socket.id}`);
-
   // Autenticar el socket
   if (!authenticateSocket(socket)) {
     socket.disconnect();
@@ -253,6 +252,7 @@ export const emitToOrganization = (
  */
 export const emitToUser = (userId: string, event: string, data: any): void => {
   const room = `${CONFIG.ROOM_PREFIX.USER}${userId}`;
+  const socketInstance = getSocketInstance();
   emitToRoom(room, event, data);
 };
 

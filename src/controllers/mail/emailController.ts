@@ -4,6 +4,7 @@ import UserModel from "../../models/UserModel";
 import { sendEmailViaSMTP } from "../../utils/smtpClient";
 import { deleteEmailFromServer } from "../../utils/imapClient";
 import imaps from "imap-simple";
+import { emitToUser } from "../../config/socket";
 
 /**
  * Lista los correos electrónicos de un usuario.
@@ -16,17 +17,90 @@ export const fetchEmails = async (req: Request, res: Response) => {
       return res.status(401).json({ error: "Unauthorized" });
     }
 
-    const { offset = 0, limit = 10, folder = "inbox" } = req.query;
+    // Extraer parámetros de query
+    const {
+      page = 1,
+      limit = 50,
+      folder = "INBOX",
+      isRead,
+      isStarred,
+      hasAttachments,
+      priority,
+      labels,
+    } = req.query;
 
-    const emails = await EmailModel.find({ userId })
+    // Construir filtros
+    const filters: any = { userId };
+
+    // Mapear carpetas del frontend al backend
+    const folderMapping: { [key: string]: string } = {
+      INBOX: "INBOX",
+      SENT: "SENT",
+      STARRED: "INBOX", // Los destacados son emails con isStarred=true
+      ARCHIVE: "ARCHIVE",
+      TRASH: "TRASH",
+      DRAFTS: "DRAFTS",
+      SPAM: "SPAM",
+    };
+
+    // Aplicar filtro de carpeta
+    if (folder && folder !== "STARRED") {
+      const mappedFolder = folderMapping[folder as string] || folder;
+      filters.folder = mappedFolder;
+    }
+
+    // Filtros adicionales
+    if (isRead !== undefined) {
+      filters.isRead = isRead === "true";
+    }
+
+    if (isStarred !== undefined || folder === "STARRED") {
+      filters.isStarred = true;
+    }
+
+    if (hasAttachments !== undefined) {
+      filters.hasAttachments = hasAttachments === "true";
+    }
+
+    if (priority) {
+      filters.priority = priority;
+    }
+
+    if (labels) {
+      const labelArray =
+        typeof labels === "string" ? labels.split(",") : labels;
+      filters.labels = { $in: labelArray };
+    }
+
+    // Calcular offset
+    const pageNum = parseInt(page as string);
+    const limitNum = parseInt(limit as string);
+    const offset = (pageNum - 1) * limitNum;
+
+    // Obtener total primero
+    const total = await EmailModel.countDocuments(filters);
+
+    // Obtener emails con filtros
+    const emails = await EmailModel.find(filters)
       .populate("contactId")
-      .skip(Number(offset))
-      .limit(Number(limit))
+      .skip(offset)
+      .limit(limitNum)
       .sort({ date: -1 });
 
-    res.status(200).json(emails);
+    // Estructura de respuesta que espera el frontend
+    const response = {
+      emails,
+      pagination: {
+        page: pageNum,
+        limit: limitNum,
+        total,
+        hasMore: offset + limitNum < total,
+      },
+    };
+
+    res.status(200).json(response);
   } catch (error) {
-    console.error("Error fetching emails:", error);
+    console.error("❌ Error fetching emails:", error);
     res.status(500).json({ error: "Failed to fetch emails." });
   }
 };
@@ -221,8 +295,6 @@ export const updateEmail = async (req: Request, res: Response) => {
     const { id } = req.params;
     const updates = req.body;
 
-    console.log(id, updates);
-
     if (!userId) {
       return res.status(401).json({ error: "Unauthorized" });
     }
@@ -252,12 +324,6 @@ export const downloadAttachment = async (req: Request, res: Response) => {
     const userId = req.user?._id;
     const { emailId, partID } = req.params;
 
-    console.log("Request received for downloading attachment:", {
-      userId,
-      emailId,
-      partID,
-    });
-
     if (!userId) {
       console.error("Unauthorized access attempt.");
       return res.status(401).json({ error: "Unauthorized" });
@@ -271,8 +337,6 @@ export const downloadAttachment = async (req: Request, res: Response) => {
       return res.status(404).json({ error: "Email not found." });
     }
 
-    console.log("Email found:", { emailId, uid: email.uid });
-
     // Buscar el adjunto en el correo
     const attachment = email.attachments?.find((att) => att.partID === partID);
 
@@ -280,8 +344,6 @@ export const downloadAttachment = async (req: Request, res: Response) => {
       console.error("Attachment not found in email:", { emailId, partID });
       return res.status(404).json({ error: "Attachment not found." });
     }
-
-    console.log("Attachment metadata found:", attachment);
 
     // Obtener las configuraciones IMAP del usuario
     const user = await UserModel.findOne({ _id: userId }).select(
@@ -295,25 +357,18 @@ export const downloadAttachment = async (req: Request, res: Response) => {
         .json({ error: "IMAP settings not found for user." });
     }
 
-    console.log("IMAP settings found for user.");
-
     // Conectar al servidor IMAP
     const connection = await imaps.connect({
       imap: { ...user.emailSettings.imapSettings, authTimeout: 10000 },
     });
 
-    console.log("IMAP connection established.");
-
     await connection.openBox("INBOX");
-    console.log("INBOX opened successfully.");
 
     // Buscar el mensaje en el servidor IMAP
     const message = await connection.search([["UID", email.uid.toString()]], {
       bodies: [""],
       struct: true,
     });
-
-    console.log("Message retrieved from IMAP server:", message);
 
     if (!message.length) {
       console.error("No message found for UID:", email.uid);
@@ -345,15 +400,11 @@ export const downloadAttachment = async (req: Request, res: Response) => {
       return res.status(404).json({ error: "Attachment part not found." });
     }
 
-    console.log("Resolved part for attachment:", part);
     // Descargar el adjunto
     const attachmentStream = await connection.getPartData(message[0], part);
 
-    console.log("Attachment downloaded successfully.");
-
     // Finalizar la conexión
     await connection.end();
-    console.log("IMAP connection closed.");
 
     // Enviar el adjunto al cliente
     res.setHeader("Content-Type", attachment.contentType);
@@ -362,7 +413,6 @@ export const downloadAttachment = async (req: Request, res: Response) => {
       `attachment; filename="${attachment.filename}"`
     );
     res.send(attachmentStream);
-    console.log("Attachment sent to client.");
   } catch (error) {
     console.error("Error downloading attachment:", error);
     res.status(500).json({ error: "Failed to download attachment." });
