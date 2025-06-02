@@ -1,0 +1,76 @@
+{
+  "validUser": {
+    "name": "Usuario Test",
+    "email": "test@example.com",
+    "password": "password123",
+    "role": "user",
+    "isActive": true
+  },
+  "adminUser": {
+    "name": "Admin Test",
+    "email": "admin@example.com",
+    "password": "admin123",
+    "role": "admin",
+    "isActive": true
+  },
+  "inactiveUser": {
+    "name": "Usuario Inactivo",
+    "email": "inactive@example.com",
+    "password": "password123",
+    "role": "user",
+    "isActive": false
+  },
+  "userWithoutPassword": {
+    "name": "Usuario Sin Password",
+    "email": "nopass@example.com",
+    "role": "user",
+    "isActive": true
+  },
+  "invalidEmailUser": {
+    "name": "Usuario Email Inválido",
+    "email": "invalid-email",
+    "password": "password123",
+    "role": "user",
+    "isActive": true
+  },
+  "usersList": [
+    {
+      "name": "Juan Pérez",
+      "email": "juan@example.com",
+      "password": "password123",
+      "role": "user",
+      "isActive": true
+    },
+    {
+      "name": "María García",
+      "email": "maria@example.com",
+      "password": "password123",
+      "role": "user",
+      "isActive": true
+    },
+    {
+      "name": "Carlos López",
+      "email": "carlos@example.com",
+      "password": "admin123",
+      "role": "admin",
+      "isActive": true
+    }
+  ],
+  "loginCredentials": {
+    "valid": {
+      "email": "test@example.com",
+      "password": "password123"
+    },
+    "invalidEmail": {
+      "email": "wrong@example.com",
+      "password": "password123"
+    },
+    "invalidPassword": {
+      "email": "test@example.com",
+      "password": "wrongpassword"
+    },
+    "missingFields": {
+      "email": "test@example.com"
+    }
+  }
+}

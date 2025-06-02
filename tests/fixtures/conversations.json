@@ -1,0 +1,145 @@
+{
+  "activeConversation": {
+    "title": "Conversación Activa",
+    "status": "active",
+    "channel": "whatsapp",
+    "contactId": "contact-1",
+    "assignedTo": "user-1",
+    "messages": [
+      {
+        "content": "Hola, ¿cómo están?",
+        "sender": "contact",
+        "timestamp": "2024-01-01T10:00:00.000Z",
+        "messageType": "text"
+      },
+      {
+        "content": "¡Hola! Muy bien, gracias por preguntar.",
+        "sender": "agent",
+        "timestamp": "2024-01-01T10:01:00.000Z",
+        "messageType": "text"
+      }
+    ],
+    "tags": ["cliente", "soporte"],
+    "priority": "medium"
+  },
+  "closedConversation": {
+    "title": "Conversación Cerrada",
+    "status": "closed",
+    "channel": "email",
+    "contactId": "contact-2",
+    "assignedTo": "user-2",
+    "messages": [
+      {
+        "content": "Necesito ayuda con mi pedido",
+        "sender": "contact",
+        "timestamp": "2024-01-01T09:00:00.000Z",
+        "messageType": "text"
+      },
+      {
+        "content": "Por supuesto, ¿cuál es tu número de pedido?",
+        "sender": "agent",
+        "timestamp": "2024-01-01T09:05:00.000Z",
+        "messageType": "text"
+      },
+      {
+        "content": "Es el #12345",
+        "sender": "contact",
+        "timestamp": "2024-01-01T09:10:00.000Z",
+        "messageType": "text"
+      },
+      {
+        "content": "Perfecto, ya revisé tu pedido y está en camino.",
+        "sender": "agent",
+        "timestamp": "2024-01-01T09:15:00.000Z",
+        "messageType": "text"
+      }
+    ],
+    "tags": ["pedido", "resuelto"],
+    "priority": "low",
+    "closedAt": "2024-01-01T09:20:00.000Z"
+  },
+  "pendingConversation": {
+    "title": "Conversación Pendiente",
+    "status": "pending",
+    "channel": "webchat",
+    "contactId": "contact-3",
+    "messages": [
+      {
+        "content": "Hola, tengo una pregunta sobre sus servicios",
+        "sender": "contact",
+        "timestamp": "2024-01-01T11:00:00.000Z",
+        "messageType": "text"
+      }
+    ],
+    "tags": ["nuevo", "consulta"],
+    "priority": "high"
+  },
+  "conversationsList": [
+    {
+      "id": "conv-1",
+      "title": "Consulta sobre Producto",
+      "status": "active",
+      "channel": "whatsapp",
+      "contactName": "Juan Pérez",
+      "lastMessage": "¿Tienen disponibilidad?",
+      "lastMessageAt": "2024-01-01T12:00:00.000Z",
+      "assignedTo": "user-1",
+      "priority": "medium",
+      "unreadCount": 2
+    },
+    {
+      "id": "conv-2",
+      "title": "Soporte Técnico",
+      "status": "pending",
+      "channel": "email",
+      "contactName": "María García",
+      "lastMessage": "No puedo acceder a mi cuenta",
+      "lastMessageAt": "2024-01-01T11:30:00.000Z",
+      "priority": "high",
+      "unreadCount": 1
+    },
+    {
+      "id": "conv-3",
+      "title": "Información de Precios",
+      "status": "closed",
+      "channel": "webchat",
+      "contactName": "Carlos López",
+      "lastMessage": "Muchas gracias por la información",
+      "lastMessageAt": "2024-01-01T10:45:00.000Z",
+      "assignedTo": "user-2",
+      "priority": "low",
+      "unreadCount": 0
+    }
+  ],
+  "messageTypes": {
+    "textMessage": {
+      "content": "Este es un mensaje de texto",
+      "sender": "contact",
+      "messageType": "text",
+      "timestamp": "2024-01-01T12:00:00.000Z"
+    },
+    "imageMessage": {
+      "content": "Imagen adjunta",
+      "sender": "contact",
+      "messageType": "image",
+      "mediaUrl": "https://example.com/image.jpg",
+      "timestamp": "2024-01-01T12:01:00.000Z"
+    },
+    "documentMessage": {
+      "content": "Documento adjunto",
+      "sender": "contact",
+      "messageType": "document",
+      "mediaUrl": "https://example.com/document.pdf",
+      "fileName": "documento.pdf",
+      "timestamp": "2024-01-01T12:02:00.000Z"
+    },
+    "audioMessage": {
+      "content": "Mensaje de voz",
+      "sender": "contact",
+      "messageType": "audio",
+      "mediaUrl": "https://example.com/audio.mp3",
+      "duration": 30,
+      "timestamp": "2024-01-01T12:03:00.000Z"
+    }
+  }
+}
