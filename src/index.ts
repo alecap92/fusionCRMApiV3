@@ -37,6 +37,7 @@ const configureMiddleware = (app: Application): void => {
         "http://localhost:5173", // Vite dev server
         "https://fusioncrm-86214.firebaseapp.com",
         "https://fusioncol.vercel.app", // Si usas Vercel
+        "https://app.fusioncol.com", // Si usas Vercel
         // Agregar tu dominio de producción aquí
       ],
       credentials: true,
