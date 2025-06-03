@@ -4,6 +4,7 @@ import { IAuthRequest, RegisterForm } from "../../types/index";
 import UserModel, { IUser } from "../../models/UserModel";
 import OrganizationModel from "../../models/OrganizationModel";
 import { generateToken } from "../../middlewares/authMiddleware";
+import { auth } from "../../config/firebase";
 
 export const login = async (req: Request, res: Response) => {
   try {
@@ -21,13 +22,9 @@ export const login = async (req: Request, res: Response) => {
       return res.status(400).json({ message: "Invalid email or password" });
     }
 
-    // 3. Eliminar password del objeto user antes de enviarlo
-    const userObject = user.toObject() as Partial<IUser>;
-    delete userObject.password;
-
-    // 4. Buscar la organización
+    // 3. Buscar la organización
     const organization = await OrganizationModel.findOne({
-      employees: userObject._id,
+      employees: user._id,
     }).populate("employees");
 
     if (!organization) {
@@ -36,13 +33,15 @@ export const login = async (req: Request, res: Response) => {
         .json({ message: "No tiene organización asociada" });
     }
 
-    // 5. Agregar organizationId al objeto user
-    const userWithOrganizationId = {
-      ...userObject,
+    // 4. Agregar organizationId al objeto user
+    const userObject = user.toObject() as Partial<IUser>;
+    const { password: _pwd, ...userWithoutPassword2 } = userObject;
+    const userWithOrganizationId2 = {
+      ...userWithoutPassword2,
       organizationId: organization._id.toString(),
     };
 
-    // 6. Generar token
+    // 5. Generar token
     const token = generateToken(
       {
         _id: user._id,
@@ -57,7 +56,7 @@ export const login = async (req: Request, res: Response) => {
 
     return res.status(200).json({
       token: `${token}`,
-      user: userWithOrganizationId,
+      user: userWithOrganizationId2,
       organization,
     });
   } catch (error) {
@@ -113,11 +112,12 @@ export const register = async (req: Request, res: Response) => {
     });
 
     // 6. Agregar organizationId al objeto user
-    const userWithOrganizationId: any = {
-      ...newUser.toObject(),
+    const newUserObject = newUser.toObject();
+    const { password: _, ...userWithoutPassword } = newUserObject;
+    const userWithOrganizationId = {
+      ...userWithoutPassword,
       organizationId: newOrganization._id.toString(),
     };
-    delete userWithOrganizationId.password; // Eliminar password del objeto
 
     return res.status(201).json({
       message: "Usuario registrado exitosamente",
@@ -161,14 +161,16 @@ export const verifyToken = async (req: IAuthRequest, res: Response) => {
     }
 
     // Agregar organizationId al objeto user antes de devolverlo
-    const userWithOrganizationId = {
-      ...user.toObject(),
-      organizationId: organizationId || organization._id.toString(),
+    const userObject = user.toObject() as Partial<IUser>;
+    const { password: _pwd, ...userWithoutPassword2 } = userObject;
+    const userWithOrganizationId2 = {
+      ...userWithoutPassword2,
+      organizationId: organization._id.toString(),
     };
 
     // Respuesta con datos del usuario (incluyendo organizationId) y organización
     return res.status(200).json({
-      user: userWithOrganizationId,
+      user: userWithOrganizationId2,
       organization,
     });
   } catch (error) {
@@ -242,6 +244,168 @@ export const refreshToken = async (req: IAuthRequest, res: Response) => {
     });
   } catch (error) {
     console.error("Error en refreshToken:", error);
+    return res.status(500).json({ message: "Error en el servidor" });
+  }
+};
+
+// Método para LOGIN con Firebase (solo usuarios existentes)
+export const firebaseLogin = async (req: Request, res: Response) => {
+  try {
+    const { idToken, provider } = req.body;
+
+    if (!idToken) {
+      return res.status(400).json({ message: "Token de Firebase requerido" });
+    }
+
+    // Verificar el token con Firebase Admin
+    const decodedToken = await auth.verifyIdToken(idToken);
+    const { uid, email, name, picture } = decodedToken;
+
+    if (!email) {
+      return res
+        .status(400)
+        .json({ message: "Email no disponible en el token de Firebase" });
+    }
+
+    // Buscar si el usuario ya existe
+    const user = await UserModel.findOne({ email });
+
+    if (!user) {
+      // Usuario NO existe - devolver error
+      return res.status(404).json({
+        message: "Usuario no encontrado. Por favor, regístrate primero.",
+      });
+    }
+
+    // Usuario existe - hacer login
+    const organization = await OrganizationModel.findOne({
+      employees: user._id,
+    }).populate("employees");
+
+    if (!organization) {
+      return res
+        .status(401)
+        .json({ message: "No tiene organización asociada" });
+    }
+
+    // Actualizar avatar si viene de Firebase y no lo tiene
+    if (picture && !user.avatar) {
+      user.avatar = picture;
+      await user.save();
+    }
+
+    // Agregar organizationId al objeto user
+    const userObject = user.toObject() as Partial<IUser>;
+    const { password: _firebasePwd, ...userWithoutPassword } = userObject;
+    const userWithOrganizationId = {
+      ...userWithoutPassword,
+      organizationId: organization._id.toString(),
+    };
+
+    // Generar token JWT
+    const token = generateToken({
+      _id: user._id,
+      email: user.email,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      mobile: user.mobile,
+      organizationId: organization._id.toString(),
+    });
+
+    return res.status(200).json({
+      token: `${token}`,
+      user: userWithOrganizationId,
+      organization,
+    });
+  } catch (error) {
+    console.error("Error en login Firebase:", error);
+    return res.status(500).json({ message: "Error en el servidor" });
+  }
+};
+
+// Método para REGISTRO con Firebase (crear nuevo usuario)
+export const firebaseRegister = async (req: Request, res: Response) => {
+  try {
+    const { idToken, provider } = req.body;
+
+    if (!idToken) {
+      return res.status(400).json({ message: "Token de Firebase requerido" });
+    }
+
+    // Verificar el token con Firebase Admin
+    const decodedToken = await auth.verifyIdToken(idToken);
+    const { uid, email, name, picture } = decodedToken;
+
+    if (!email) {
+      return res
+        .status(400)
+        .json({ message: "Email no disponible en el token de Firebase" });
+    }
+
+    // Verificar si el usuario ya existe
+    const existingUser = await UserModel.findOne({ email });
+
+    if (existingUser) {
+      // Usuario YA existe - devolver error
+      return res.status(409).json({
+        message: "El usuario ya existe. Por favor, inicia sesión.",
+      });
+    }
+
+    // Usuario no existe - crear nuevo usuario
+    const [firstName, ...lastNameParts] = (name || email.split("@")[0]).split(
+      " "
+    );
+    const lastName = lastNameParts.join(" ") || "";
+
+    const newUser = new UserModel({
+      email,
+      password: await bcrypt.hash(uid, 10), // Usar UID como password hasheada
+      firstName,
+      lastName,
+      mobile: "", // Firebase no siempre proporciona teléfono
+      avatar: picture || "",
+      emailSettings: {
+        emailAddress: email,
+      },
+      firebaseUid: uid, // Guardar UID de Firebase para futuras referencias
+    });
+    await newUser.save();
+
+    // Crear nueva organización
+    const newOrganization = new OrganizationModel({
+      companyName: "",
+      employees: [newUser._id],
+      phone: "",
+    });
+    await newOrganization.save();
+
+    // Agregar organizationId al objeto user
+    const userObject = newUser.toObject() as Partial<IUser>;
+    const { password: _firebasePwd, ...userWithoutPassword } = userObject;
+    const userWithOrganizationId = {
+      ...userWithoutPassword,
+      organizationId: newOrganization._id.toString(),
+    };
+
+    // Generar token JWT
+    const token = generateToken({
+      _id: newUser._id,
+      email: newUser.email,
+      firstName: newUser.firstName,
+      lastName: newUser.lastName,
+      mobile: newUser.mobile,
+      organizationId: newOrganization._id.toString(),
+    });
+
+    return res.status(201).json({
+      message: "Usuario registrado exitosamente",
+      token: `${token}`,
+      user: userWithOrganizationId,
+      organization: newOrganization,
+    });
+  } catch (error) {
+    console.error("Error en registro Firebase:", error);
     return res.status(500).json({ message: "Error en el servidor" });
   }
 };

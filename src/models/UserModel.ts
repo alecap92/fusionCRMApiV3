@@ -36,6 +36,8 @@ export interface IUser extends Document {
   emailSettings: IEmailSettings;
   pushToken: string[];
   organizationId: string;
+  firebaseUid?: string; // UID de Firebase para usuarios autenticados con Firebase
+  avatar?: string; // URL del avatar del usuario
 }
 
 export interface IUserPayload
@@ -57,6 +59,8 @@ const userSchema = new Schema<IUser>(
     createdAt: { type: Date, default: Date.now },
     updatedAt: { type: Date, default: Date.now },
     pushToken: [String],
+    firebaseUid: { type: String, required: false }, // UID de Firebase
+    avatar: { type: String, required: false }, // URL del avatar
     emailSettings: {
       emailAddress: { type: String, required: true },
       imapSettings: {
