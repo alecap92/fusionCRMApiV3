@@ -67,6 +67,9 @@ const organizationSchema = new mongoose_1.Schema({
     logoUrl: {
         type: String,
     },
+    iconUrl: {
+        type: String,
+    },
     address: {
         type: addressSchema,
     },

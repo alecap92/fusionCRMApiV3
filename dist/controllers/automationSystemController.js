@@ -135,6 +135,9 @@ const createAutomation = (req, res) => __awaiter(void 0, void 0, void 0, functio
                         else if (triggerNode.event === "keyword") {
                             triggerType = "keyword";
                         }
+                        else if (triggerNode.event === "whatsapp_message") {
+                            triggerType = "whatsapp_message";
+                        }
                         else {
                             triggerType = "message_received";
                         }
@@ -196,6 +199,9 @@ const updateAutomation = (req, res) => __awaiter(void 0, void 0, void 0, functio
                         }
                         else if (triggerNode.event === "keyword") {
                             req.body.triggerType = "keyword";
+                        }
+                        else if (triggerNode.event === "whatsapp_message") {
+                            req.body.triggerType = "whatsapp_message";
                         }
                         else {
                             req.body.triggerType = "message_received";

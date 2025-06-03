@@ -8,5 +8,8 @@ const router = (0, express_1.Router)();
 router.post("/login", authController_1.login);
 router.post("/register", authController_1.register);
 router.post("/verify-token", authMiddleware_1.verifyToken, authController_1.verifyToken);
-router.post("/refresh", authMiddleware_1.verifyToken, authController_1.refreshToken); // Añadir este endpoint
+router.post("/refresh", authMiddleware_1.verifyToken, authController_1.refreshToken);
+// Endpoints para autenticación con Firebase (separados)
+router.post("/firebase-login", authController_1.firebaseLogin);
+router.post("/firebase-register", authController_1.firebaseRegister);
 exports.default = router;

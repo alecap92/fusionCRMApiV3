@@ -590,6 +590,13 @@ const getNodeTypes = (req, res) => __awaiter(void 0, void 0, void 0, function* (
                 ],
             },
             {
+                type: "whatsapp_message",
+                name: "Mensaje de WhatsApp",
+                description: "Inicia la automatización cuando ocurre un mensaje de WhatsApp",
+                category: "triggers",
+                configFields: [],
+            },
+            {
                 type: "http_request",
                 name: "Petición HTTP",
                 description: "Realiza una petición HTTP a un endpoint externo",

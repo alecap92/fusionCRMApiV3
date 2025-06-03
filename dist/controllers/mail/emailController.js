@@ -28,16 +28,68 @@ const fetchEmails = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
         if (!userId) {
             return res.status(401).json({ error: "Unauthorized" });
         }
-        const { offset = 0, limit = 10, folder = "inbox" } = req.query;
-        const emails = yield EmailModel_1.default.find({ userId })
+        // Extraer parámetros de query
+        const { page = 1, limit = 50, folder = "INBOX", isRead, isStarred, hasAttachments, priority, labels, } = req.query;
+        // Construir filtros
+        const filters = { userId };
+        // Mapear carpetas del frontend al backend
+        const folderMapping = {
+            INBOX: "INBOX",
+            SENT: "SENT",
+            STARRED: "INBOX", // Los destacados son emails con isStarred=true
+            ARCHIVE: "ARCHIVE",
+            TRASH: "TRASH",
+            DRAFTS: "DRAFTS",
+            SPAM: "SPAM",
+        };
+        // Aplicar filtro de carpeta
+        if (folder && folder !== "STARRED") {
+            const mappedFolder = folderMapping[folder] || folder;
+            filters.folder = mappedFolder;
+        }
+        // Filtros adicionales
+        if (isRead !== undefined) {
+            filters.isRead = isRead === "true";
+        }
+        if (isStarred !== undefined || folder === "STARRED") {
+            filters.isStarred = true;
+        }
+        if (hasAttachments !== undefined) {
+            filters.hasAttachments = hasAttachments === "true";
+        }
+        if (priority) {
+            filters.priority = priority;
+        }
+        if (labels) {
+            const labelArray = typeof labels === "string" ? labels.split(",") : labels;
+            filters.labels = { $in: labelArray };
+        }
+        // Calcular offset
+        const pageNum = parseInt(page);
+        const limitNum = parseInt(limit);
+        const offset = (pageNum - 1) * limitNum;
+        // Obtener total primero
+        const total = yield EmailModel_1.default.countDocuments(filters);
+        // Obtener emails con filtros
+        const emails = yield EmailModel_1.default.find(filters)
             .populate("contactId")
-            .skip(Number(offset))
-            .limit(Number(limit))
+            .skip(offset)
+            .limit(limitNum)
             .sort({ date: -1 });
-        res.status(200).json(emails);
+        // Estructura de respuesta que espera el frontend
+        const response = {
+            emails,
+            pagination: {
+                page: pageNum,
+                limit: limitNum,
+                total,
+                hasMore: offset + limitNum < total,
+            },
+        };
+        res.status(200).json(response);
     }
     catch (error) {
-        console.error("Error fetching emails:", error);
+        console.error("❌ Error fetching emails:", error);
         res.status(500).json({ error: "Failed to fetch emails." });
     }
 });
@@ -212,7 +264,6 @@ const updateEmail = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
         const userId = (_a = req.user) === null || _a === void 0 ? void 0 : _a._id;
         const { id } = req.params;
         const updates = req.body;
-        console.log(id, updates);
         if (!userId) {
             return res.status(401).json({ error: "Unauthorized" });
         }
@@ -236,11 +287,6 @@ const downloadAttachment = (req, res) => __awaiter(void 0, void 0, void 0, funct
     try {
         const userId = (_a = req.user) === null || _a === void 0 ? void 0 : _a._id;
         const { emailId, partID } = req.params;
-        console.log("Request received for downloading attachment:", {
-            userId,
-            emailId,
-            partID,
-        });
         if (!userId) {
             console.error("Unauthorized access attempt.");
             return res.status(401).json({ error: "Unauthorized" });
@@ -251,14 +297,12 @@ const downloadAttachment = (req, res) => __awaiter(void 0, void 0, void 0, funct
             console.error("Email not found:", { emailId });
             return res.status(404).json({ error: "Email not found." });
         }
-        console.log("Email found:", { emailId, uid: email.uid });
         // Buscar el adjunto en el correo
         const attachment = (_b = email.attachments) === null || _b === void 0 ? void 0 : _b.find((att) => att.partID === partID);
         if (!attachment) {
             console.error("Attachment not found in email:", { emailId, partID });
             return res.status(404).json({ error: "Attachment not found." });
         }
-        console.log("Attachment metadata found:", attachment);
         // Obtener las configuraciones IMAP del usuario
         const user = yield UserModel_1.default.findOne({ _id: userId }).select("emailSettings");
         if (!((_c = user === null || user === void 0 ? void 0 : user.emailSettings) === null || _c === void 0 ? void 0 : _c.imapSettings)) {
@@ -267,20 +311,16 @@ const downloadAttachment = (req, res) => __awaiter(void 0, void 0, void 0, funct
                 .status(400)
                 .json({ error: "IMAP settings not found for user." });
         }
-        console.log("IMAP settings found for user.");
         // Conectar al servidor IMAP
         const connection = yield imap_simple_1.default.connect({
             imap: Object.assign(Object.assign({}, user.emailSettings.imapSettings), { authTimeout: 10000 }),
         });
-        console.log("IMAP connection established.");
         yield connection.openBox("INBOX");
-        console.log("INBOX opened successfully.");
         // Buscar el mensaje en el servidor IMAP
         const message = yield connection.search([["UID", email.uid.toString()]], {
             bodies: [""],
             struct: true,
         });
-        console.log("Message retrieved from IMAP server:", message);
         if (!message.length) {
             console.error("No message found for UID:", email.uid);
             yield connection.end();
@@ -305,18 +345,14 @@ const downloadAttachment = (req, res) => __awaiter(void 0, void 0, void 0, funct
             yield connection.end();
             return res.status(404).json({ error: "Attachment part not found." });
         }
-        console.log("Resolved part for attachment:", part);
         // Descargar el adjunto
         const attachmentStream = yield connection.getPartData(message[0], part);
-        console.log("Attachment downloaded successfully.");
         // Finalizar la conexión
         yield connection.end();
-        console.log("IMAP connection closed.");
         // Enviar el adjunto al cliente
         res.setHeader("Content-Type", attachment.contentType);
         res.setHeader("Content-Disposition", `attachment; filename="${attachment.filename}"`);
         res.send(attachmentStream);
-        console.log("Attachment sent to client.");
     }
     catch (error) {
         console.error("Error downloading attachment:", error);

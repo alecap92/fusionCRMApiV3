@@ -11,22 +11,24 @@ const userSchema = new mongoose_1.Schema({
     createdAt: { type: Date, default: Date.now },
     updatedAt: { type: Date, default: Date.now },
     pushToken: [String],
+    firebaseUid: { type: String, required: false }, // UID de Firebase
+    avatar: { type: String, required: false }, // URL del avatar
     emailSettings: {
         emailAddress: { type: String, required: true },
         imapSettings: {
-            host: { type: String, required: true },
-            port: { type: Number, required: true },
-            user: { type: String, required: true },
-            password: { type: String, required: true },
-            tls: { type: Boolean },
-            lastUID: { type: Number }, // Inicializa en 0 si no se usa aún
+            host: { type: String, required: false, default: "" },
+            port: { type: Number, required: false, default: 993 },
+            user: { type: String, required: false, default: "" },
+            password: { type: String, required: false, default: "" },
+            tls: { type: Boolean, default: true },
+            lastUID: { type: Number, default: 0 }, // Inicializa en 0 si no se usa aún
         },
         smtpSettings: {
-            host: { type: String, required: true },
-            port: { type: Number, required: true },
-            user: { type: String, required: true },
-            password: { type: String, required: true },
-            secure: { type: Boolean, required: true }, // Define si usa conexión segura
+            host: { type: String, required: false, default: "" },
+            port: { type: Number, required: false, default: 587 },
+            user: { type: String, required: false, default: "" },
+            password: { type: String, required: false, default: "" },
+            secure: { type: Boolean, required: false, default: false }, // Define si usa conexión segura
         },
     },
 }, {

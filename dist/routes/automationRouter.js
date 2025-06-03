@@ -8,7 +8,7 @@ const router = (0, express_1.Router)();
 // Obtener tipos de nodos disponibles
 router.get("/nodes/types", nodeTypesController_1.getNodeTypes);
 // Obtener módulos y eventos disponibles
-router.get("/modules", nodeTypesController_1.getAvailableModules);
+router.get("/modules", automationController_1.getAvailableModules);
 // Obtener todas las automatizaciones (con filtros)
 router.get("/", automationController_1.getAutomations);
 // DESPUÉS vienen las rutas con parámetros

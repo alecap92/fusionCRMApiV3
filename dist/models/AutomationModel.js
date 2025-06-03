@@ -115,6 +115,7 @@ const AutomationSchema = new mongoose_1.Schema({
             "contact",
             "task",
             "manual",
+            "whatsapp_message",
         ],
         required: true,
     },
@@ -178,6 +179,8 @@ AutomationSchema.methods.detectTriggerType = function () {
             return "conversation_started";
         if (triggerNode.event === "keyword")
             return "keyword";
+        if (triggerNode.event === "whatsapp_message")
+            return "whatsapp_message";
         return "message_received";
     }
     if (triggerNode.module === "webhook")

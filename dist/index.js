@@ -29,7 +29,34 @@ const initializeServices = () => __awaiter(void 0, void 0, void 0, function* () 
 });
 // Configuración de middleware
 const configureMiddleware = (app) => {
-    app.use((0, cors_1.default)());
+    // Configuración mejorada de CORS para Firebase Auth
+    app.use((0, cors_1.default)({
+        origin: [
+            "http://localhost:3000",
+            "http://localhost:5173", // Vite dev server
+            "https://fusioncrm-86214.firebaseapp.com",
+            "https://fusioncol.vercel.app", // Si usas Vercel
+            "https://app.fusioncol.com", // Si usas Vercel
+            // Agregar tu dominio de producción aquí
+        ],
+        credentials: true,
+        methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+        allowedHeaders: [
+            "Content-Type",
+            "Authorization",
+            "X-Requested-With",
+            "Accept",
+            "Origin",
+        ],
+        exposedHeaders: ["Authorization"],
+        optionsSuccessStatus: 200, // Para navegadores legacy
+    }));
+    // Headers adicionales para Firebase Auth popups
+    app.use((req, res, next) => {
+        res.header("Cross-Origin-Opener-Policy", "same-origin-allow-popups");
+        res.header("Cross-Origin-Embedder-Policy", "unsafe-none");
+        next();
+    });
     // Middleware condicional para parseo de body
     app.use((req, res, next) => {
         const contentType = req.headers["content-type"] || "";
@@ -126,6 +153,7 @@ const configureRoutes = (app) => {
     // Rutas públicas
     const publicRoutes = [
         { path: "/api/v1/auth", router: routes_1.default.authRouter },
+        { path: "/api/auth", router: routes_1.default.authRouter },
         { path: "/api/v1/chat", router: routes_1.default.chatRouter },
         { path: "/api/v1/files", router: routes_1.default.fileRouter },
         { path: "/api/v1/forms", router: routes_1.default.formRouter },

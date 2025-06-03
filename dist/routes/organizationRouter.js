@@ -12,5 +12,6 @@ const upload = (0, multer_1.default)({ storage });
 router.get("/", organizationController_1.getOrganization);
 router.get("/:id", organizationController_1.getOrganizationById);
 router.put("/", organizationController_1.updateOrganization);
-router.post("/uploadLogo", upload.single("logo"), organizationController_1.uploadLogo);
+router.post("/upload-logo", upload.single("logo"), organizationController_1.uploadLogo);
+router.post("/upload-icon", upload.single("icon"), organizationController_1.uploadIcon);
 exports.default = router;

@@ -67,6 +67,7 @@ class AutomationExecutor {
                         { triggerType: "message_received" },
                         { triggerType: "conversation_started" },
                         { triggerType: "keyword" },
+                        { triggerType: "whatsapp_message" }, // Nuevo trigger específico
                         // También buscar por nodos para automatizaciones visuales
                         { "nodes.type": "trigger", "nodes.module": "whatsapp" },
                     ],

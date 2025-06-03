@@ -37,7 +37,7 @@ const getDeals = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
         return;
     }
     const { organizationId } = req.user;
-    const { pipelineId, name } = req.query;
+    const { pipelineId, name, page = 1, limit = 20 } = req.query;
     const filterDates = req.query.filterDates;
     const startDate = filterDates ? filterDates.startDate : "";
     const endDate = filterDates ? filterDates.endDate : "";
@@ -63,10 +63,18 @@ const getDeals = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
         if (name) {
             query.title = { $regex: name, $options: "i" };
         }
+        // Calcular skip para paginación
+        const pageNum = parseInt(page);
+        const limitNum = parseInt(limit);
+        const skip = (pageNum - 1) * limitNum;
+        // Obtener el total de documentos para calcular totalPages
+        const total = yield DealsModel_1.default.countDocuments(query);
         const deals = yield DealsModel_1.default.find(query)
             .populate("associatedContactId")
             .populate("status")
             .sort({ closingDate: -1 })
+            .skip(skip)
+            .limit(limitNum)
             .exec();
         const dealsFields = yield DealsFieldsValuesModel_1.default.find({
             deal: { $in: deals.map((deal) => deal._id) },
@@ -84,7 +92,16 @@ const getDeals = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
             const dealProductsFiltered = dealProducts.filter((product) => product.dealId && product.dealId.toString() === deal._id.toString());
             return Object.assign(Object.assign({}, deal.toObject()), { fields, dealProducts: dealProductsFiltered });
         });
-        res.status(200).json(dealsToSend);
+        // Respuesta con información de paginación
+        res.status(200).json({
+            data: dealsToSend,
+            total,
+            page: pageNum,
+            limit: limitNum,
+            totalPages: Math.ceil(total / limitNum),
+            hasNextPage: pageNum < Math.ceil(total / limitNum),
+            hasPrevPage: pageNum > 1,
+        });
     }
     catch (error) {
         console.error("Error obteniendo los tratos:", error);

@@ -12,7 +12,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.uploadLogo = exports.searchOrganization = exports.deleteOrganization = exports.updateOrganization = exports.getOrganizationById = exports.createOrganization = exports.getOrganization = void 0;
+exports.uploadIcon = exports.uploadLogo = exports.searchOrganization = exports.deleteOrganization = exports.updateOrganization = exports.getOrganizationById = exports.createOrganization = exports.getOrganization = void 0;
 const OrganizationModel_1 = __importDefault(require("../../models/OrganizationModel"));
 const cloudinary = require("../../config/cloudinaryConfig");
 // Obtener todas las organizaciones
@@ -153,3 +153,41 @@ const uploadLogo = (req, res) => __awaiter(void 0, void 0, void 0, function* () 
     }
 });
 exports.uploadLogo = uploadLogo;
+const uploadIcon = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a;
+    try {
+        const organizationId = (_a = req.user) === null || _a === void 0 ? void 0 : _a.organizationId;
+        if (!organizationId) {
+            return res
+                .status(400)
+                .json({ error: "No se proporcionó el ID de la organización" });
+        }
+        if (!req.file) {
+            return res
+                .status(400)
+                .json({ error: "No se proporcionó un archivo para subir" });
+        }
+        // Subir el archivo a Cloudinary usando el buffer
+        const result = yield new Promise((resolve, reject) => {
+            var _a;
+            const uploadStream = cloudinary.uploader.upload_stream({ folder: "organization_icons" }, (error, result) => {
+                if (error)
+                    reject(error);
+                else
+                    resolve(result);
+            });
+            uploadStream.end((_a = req.file) === null || _a === void 0 ? void 0 : _a.buffer);
+        });
+        const updatedOrganization = yield OrganizationModel_1.default.findByIdAndUpdate({ _id: organizationId }, { iconUrl: result.secure_url }, { new: true });
+        return res.status(200).json({
+            message: "Icono actualizado con éxito",
+            iconUrl: result.secure_url,
+            organization: updatedOrganization,
+        });
+    }
+    catch (error) {
+        console.error("Error al subir el icono:", error);
+        return res.status(500).json({ error: "Error interno del servidor" });
+    }
+});
+exports.uploadIcon = uploadIcon;
