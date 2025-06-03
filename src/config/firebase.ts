@@ -14,11 +14,34 @@ const firebaseConfig = {
   client_x509_cert_url: process.env.FIREBASE_CLIENT_X509_CERT_URL,
 };
 
+// Verificar configuración
+const requiredFields = ["project_id", "private_key", "client_email"];
+const missingFields = requiredFields.filter(
+  (field) => !firebaseConfig[field as keyof typeof firebaseConfig]
+);
+
+if (missingFields.length > 0) {
+  console.error(
+    "❌ Firebase Admin: Faltan variables de entorno:",
+    missingFields
+  );
+  console.error(
+    "🔧 Asegúrate de configurar estas variables en el .env del backend"
+  );
+} else {
+  console.log("✅ Firebase Admin: Configuración completa");
+}
+
 // Inicializar Firebase Admin solo si no está ya inicializado
 if (!admin.apps.length) {
-  admin.initializeApp({
-    credential: admin.credential.cert(firebaseConfig as admin.ServiceAccount),
-  });
+  try {
+    admin.initializeApp({
+      credential: admin.credential.cert(firebaseConfig as admin.ServiceAccount),
+    });
+    console.log("✅ Firebase Admin inicializado correctamente");
+  } catch (error) {
+    console.error("❌ Error inicializando Firebase Admin:", error);
+  }
 }
 
 export const auth = admin.auth();
