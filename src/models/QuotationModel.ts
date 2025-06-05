@@ -45,7 +45,7 @@ const itemSchema = new Schema<Item>({
 });
 
 const quotationSchema = new Schema<Quotation>({
-  quotationNumber: { type: Number, required: true },
+  quotationNumber: { type: Number, required: true, unique: true },
   name: { type: String, required: true },
   observaciones: { type: String },
   contactId: { type: Schema.Types.ObjectId, ref: "Contact", required: true },

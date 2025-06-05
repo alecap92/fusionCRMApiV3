@@ -13,6 +13,7 @@ const storage = multer.memoryStorage();
 const upload = multer({ storage });
 
 router.get("/", getOrganization);
+router.get("/current", getOrganizationById);
 router.get("/:id", getOrganizationById);
 router.put("/", updateOrganization);
 router.post("/upload-logo", upload.single("logo"), uploadLogo);

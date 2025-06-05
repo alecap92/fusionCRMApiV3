@@ -6,10 +6,6 @@ import {
   getPdfAsBase64,
   getQuotationPdfFilename,
 } from "../../services/quotation/printQuotationService";
-import puppeteer from "puppeteer";
-import ejs from "ejs";
-import path from "path";
-import ContactModel from "../../models/ContactModel";
 import IntegrationsModel from "../../models/IntegrationsModel";
 
 // Get a single quotation by ID
@@ -149,6 +145,18 @@ export const createQuotation = async (req: Request, res: Response) => {
   const organizationId = req.user?.organizationId;
 
   try {
+    // search for quotation number
+    const quotationNumber = await Quotation.findOne({
+      organizationId,
+      quotationNumber: req.body.quotationNumber,
+    });
+
+    if (quotationNumber) {
+      return res
+        .status(400)
+        .json({ message: "Quotation number already exists" });
+    }
+
     const formatedQuotation = {
       items: req.body.items,
       contactId: req.body.contact.id,
