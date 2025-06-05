@@ -18,3 +18,4 @@ export {
 export { getConversationStats } from "./conversationStats";
 export { deleteConversation } from "./deleteConversation";
 export { searchConversations } from "./searchConversations";
+export { findConversationByPhone } from "./findConversationByPhone";

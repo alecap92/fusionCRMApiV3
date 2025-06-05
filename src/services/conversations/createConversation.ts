@@ -96,7 +96,6 @@ export const reopenConversationIfClosed = async (
 
       await conversation.save();
 
-      console.log(`Conversación ${conversation._id} reabierta automáticamente`);
       return true;
     }
 

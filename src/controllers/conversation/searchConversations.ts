@@ -6,8 +6,6 @@ export const searchConversations = async (req: Request, res: Response) => {
   const { query } = req.query;
   const organizationId = req.user?.organizationId;
 
-  console.log(req.query);
-
   if (!query) {
     return res.status(400).json({
       success: false,

@@ -53,12 +53,7 @@ export const addMessage = async (
 
     // Si es un mensaje entrante, verificar si la conversación debe reabrirse
     if (direction === "incoming") {
-      const wasReopened = await reopenConversationIfClosed(conversation);
-      if (wasReopened) {
-        console.log(
-          `Conversación ${conversation._id} fue reabierta automáticamente por mensaje entrante`
-        );
-      }
+      await reopenConversationIfClosed(conversation);
     }
 
     // Crear el nuevo mensaje
