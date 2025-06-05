@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 import ContactModel from "../../models/ContactModel";
 import DealsModel from "../../models/DealsModel";
+import MessageModel from "../../models/MessageModel";
 
 export const advancedSearch = async (req: Request, res: Response) => {
   try {
@@ -53,7 +54,20 @@ export const advancedSearch = async (req: Request, res: Response) => {
       title: { $regex: regexRaw },
     });
 
-    return res.status(200).json({ contacts, deals });
+    // Buscar conversaciones/mensajes
+    const conversations = await MessageModel.find({
+      $or: [
+        { from: { $regex: regex } },
+        { to: { $regex: regex } },
+        { message: { $regex: regexRaw } },
+        { possibleName: { $regex: regexRaw } },
+      ],
+      organization: organizationId,
+    })
+      .limit(limitNumber)
+      .sort({ timestamp: -1 });
+
+    return res.status(200).json({ contacts, deals, conversations });
   } catch (error) {
     console.error("Error en advancedSearch:", error);
     return res.status(500).json({ message: "Error en el servidor" });
