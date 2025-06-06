@@ -5,6 +5,8 @@ import { startOfMonth, endOfMonth } from "date-fns";
 import { subDays } from "date-fns";
 import { eventEmitter } from "../../automation/automation.listener";
 import ProductAcquisitionModel from "../../models/ProductAcquisitionModel";
+import ProductModel from "../../models/ProductModel";
+import mongoose from "mongoose";
 
 // Obtener tratos
 /**
@@ -494,20 +496,595 @@ export const editDeal = async (
  * @returns {Promise<void>} - A Promise representing the completion of the deletion operation.
  */
 export const deleteDeal = async (req: Request, res: Response) => {
+  if (!req.user) {
+    res.status(401).json({ message: "Usuario no autenticado" });
+    return;
+  }
+
+  const { id } = req.params;
+  const { organizationId } = req.user;
+
   try {
-    const dealId = req.params.id;
-
-    if (!dealId) {
-      return res.status(400).json({ message: "Falta el id del trato" });
-    }
-
-    await ProductAcquisitionModel.deleteMany({ dealId }).exec();
-
-    await Deals.deleteOne({ _id: dealId }).exec();
-
-    return res.status(200).json({ message: "Deal deleted" });
+    await Deals.findOneAndDelete({ _id: id, organizationId });
+    res.status(200).json({ message: "Trato eliminado correctamente" });
   } catch (error) {
     console.error("Error eliminando el trato:", error);
+    res.status(500).json({ message: "Error en el servidor" });
+  }
+};
+
+// Nuevos controladores para estadísticas
+/**
+ * Obtener estadísticas generales de deals para un pipeline específico
+ * Soporta período actual y período anterior (mes)
+ */
+export const getDealsStats = async (req: Request, res: Response) => {
+  if (!req.user) {
+    res.status(401).json({ message: "Usuario no autenticado" });
+    return;
+  }
+
+  const { organizationId } = req.user;
+  const { pipelineId, period = "current" } = req.query;
+
+  if (!pipelineId) {
+    res.status(400).json({ message: "Pipeline ID es requerido" });
+    return;
+  }
+
+  try {
+    const currentDate = new Date();
+    let startDate: Date, endDate: Date;
+
+    if (period === "previous") {
+      // Mes anterior
+      const previousMonth = currentDate.getMonth() - 1;
+      const year =
+        previousMonth < 0
+          ? currentDate.getFullYear() - 1
+          : currentDate.getFullYear();
+      const month = previousMonth < 0 ? 11 : previousMonth;
+
+      startDate = startOfMonth(new Date(year, month));
+      endDate = endOfMonth(new Date(year, month));
+    } else {
+      // Mes actual
+      startDate = startOfMonth(currentDate);
+      endDate = endOfMonth(currentDate);
+    }
+
+    // Query para obtener todos los deals del período sin paginación
+    const dealsQuery = {
+      organizationId,
+      pipeline: pipelineId,
+      $or: [
+        { createdAt: { $gte: startDate, $lte: endDate } },
+        { closingDate: { $gte: startDate, $lte: endDate } },
+        { updatedAt: { $gte: startDate, $lte: endDate } },
+      ],
+    };
+
+    const deals = await Deals.find(dealsQuery).populate("status").exec();
+
+    // Calcular estadísticas
+    const totalDeals = deals.length;
+    const totalAmount = deals.reduce(
+      (sum, deal) => sum + (deal.amount || 0),
+      0
+    );
+
+    // Deals cerrados/ganados (buscar por nombres comunes de status)
+    const closedDeals = deals.filter((deal) => {
+      const statusName = (deal.status as any)?.name?.toLowerCase() || "";
+      return (
+        statusName.includes("cerrado") ||
+        statusName.includes("ganado") ||
+        statusName.includes("won") ||
+        statusName.includes("closed")
+      );
+    });
+
+    const closedAmount = closedDeals.reduce(
+      (sum, deal) => sum + (deal.amount || 0),
+      0
+    );
+    const averageAmount =
+      totalDeals > 0 ? Math.round(totalAmount / totalDeals) : 0;
+    const conversionRate =
+      totalDeals > 0 ? Math.round((closedDeals.length / totalDeals) * 100) : 0;
+
+    const monthNames = [
+      "Enero",
+      "Febrero",
+      "Marzo",
+      "Abril",
+      "Mayo",
+      "Junio",
+      "Julio",
+      "Agosto",
+      "Septiembre",
+      "Octubre",
+      "Noviembre",
+      "Diciembre",
+    ];
+
+    const targetMonth =
+      period === "previous"
+        ? currentDate.getMonth() - 1 < 0
+          ? 11
+          : currentDate.getMonth() - 1
+        : currentDate.getMonth();
+
+    const targetYear =
+      period === "previous" && currentDate.getMonth() - 1 < 0
+        ? currentDate.getFullYear() - 1
+        : currentDate.getFullYear();
+
+    const stats = {
+      period: period,
+      month: monthNames[targetMonth],
+      year: targetYear,
+      totalDeals,
+      totalAmount,
+      closedDeals: closedDeals.length,
+      closedAmount,
+      averageAmount,
+      conversionRate,
+      startDate,
+      endDate,
+    };
+
+    res.status(200).json(stats);
+  } catch (error) {
+    console.error("Error obteniendo estadísticas de deals:", error);
+    res.status(500).json({ message: "Error en el servidor" });
+  }
+};
+
+/**
+ * Obtener estadísticas mensuales específicas de deals
+ */
+export const getMonthlyStats = async (req: Request, res: Response) => {
+  if (!req.user) {
+    res.status(401).json({ message: "Usuario no autenticado" });
+    return;
+  }
+
+  const { organizationId } = req.user;
+  const { pipelineId, year, month } = req.query;
+
+  if (!pipelineId) {
+    res.status(400).json({ message: "Pipeline ID es requerido" });
+    return;
+  }
+
+  try {
+    const currentDate = new Date();
+    const targetYear = year
+      ? parseInt(year as string)
+      : currentDate.getFullYear();
+    const targetMonth =
+      month !== undefined ? parseInt(month as string) : currentDate.getMonth();
+
+    const startDate = startOfMonth(new Date(targetYear, targetMonth));
+    const endDate = endOfMonth(new Date(targetYear, targetMonth));
+
+    // Query para obtener todos los deals del mes específico sin paginación
+    const dealsQuery = {
+      organizationId,
+      pipeline: pipelineId,
+      $or: [
+        { createdAt: { $gte: startDate, $lte: endDate } },
+        { closingDate: { $gte: startDate, $lte: endDate } },
+        { updatedAt: { $gte: startDate, $lte: endDate } },
+      ],
+    };
+
+    const deals = await Deals.find(dealsQuery).populate("status").exec();
+
+    // Calcular estadísticas por status
+    const statusStats = deals.reduce((acc: any, deal) => {
+      const statusName = (deal.status as any)?.name || "Sin estado";
+      if (!acc[statusName]) {
+        acc[statusName] = {
+          count: 0,
+          amount: 0,
+        };
+      }
+      acc[statusName].count++;
+      acc[statusName].amount += deal.amount || 0;
+      return acc;
+    }, {});
+
+    const totalDeals = deals.length;
+    const totalAmount = deals.reduce(
+      (sum, deal) => sum + (deal.amount || 0),
+      0
+    );
+
+    const closedDeals = deals.filter((deal) => {
+      const statusName = (deal.status as any)?.name?.toLowerCase() || "";
+      return (
+        statusName.includes("cerrado") ||
+        statusName.includes("ganado") ||
+        statusName.includes("won") ||
+        statusName.includes("closed")
+      );
+    });
+
+    const monthNames = [
+      "Enero",
+      "Febrero",
+      "Marzo",
+      "Abril",
+      "Mayo",
+      "Junio",
+      "Julio",
+      "Agosto",
+      "Septiembre",
+      "Octubre",
+      "Noviembre",
+      "Diciembre",
+    ];
+
+    const stats = {
+      month: monthNames[targetMonth],
+      year: targetYear,
+      totalDeals,
+      totalAmount,
+      closedDeals: closedDeals.length,
+      closedAmount: closedDeals.reduce(
+        (sum, deal) => sum + (deal.amount || 0),
+        0
+      ),
+      averageAmount: totalDeals > 0 ? Math.round(totalAmount / totalDeals) : 0,
+      statusBreakdown: statusStats,
+      period: {
+        startDate,
+        endDate,
+      },
+    };
+
+    res.status(200).json(stats);
+  } catch (error) {
+    console.error("Error obteniendo estadísticas mensuales:", error);
+    res.status(500).json({ message: "Error en el servidor" });
+  }
+};
+
+/**
+ * Obtener productos más vendidos basado en ProductAcquisitionModel
+ */
+export const getTopSellingProducts = async (req: Request, res: Response) => {
+  if (!req.user) {
+    res.status(401).json({ message: "Usuario no autenticado" });
+    return;
+  }
+
+  const { organizationId } = req.user;
+  const { period = "current", limit = 5 } = req.query;
+
+  try {
+    const currentDate = new Date();
+    let startDate: Date, endDate: Date;
+
+    console.log("🔍 [TopProducts] Current date:", currentDate);
+    console.log("🔍 [TopProducts] Period:", period);
+    console.log("🔍 [TopProducts] Organization ID:", organizationId);
+
+    if (period === "previous") {
+      // Mes anterior completo
+      endDate = new Date(); // Hoy
+      startDate = new Date();
+      startDate.setMonth(startDate.getMonth() - 1); // Hace 1 mes exacto
+    } else {
+      // Búsqueda amplia: último año completo hasta próximo año
+      startDate = new Date();
+      startDate.setFullYear(startDate.getFullYear() - 1); // Hace 1 año
+      endDate = new Date();
+      endDate.setFullYear(endDate.getFullYear() + 1); // Próximo año completo
+    }
+
+    console.log("🔍 [TopProducts] Date range:", { startDate, endDate });
+
+    // Primero verificar si hay registros en ProductAcquisition para esta organización
+    const totalRecords = await ProductAcquisitionModel.countDocuments({
+      organizationId,
+    });
+    console.log(
+      "🔍 [TopProducts] Total records in ProductAcquisition for org:",
+      totalRecords
+    );
+
+    // Verificar registros en el período específico
+    const recordsInPeriod = await ProductAcquisitionModel.countDocuments({
+      organizationId,
+      acquisitionDate: { $gte: startDate, $lte: endDate },
+    });
+    console.log("🔍 [TopProducts] Records in period:", recordsInPeriod);
+
+    // Usar el período especificado directamente
+    let actualStartDate = startDate;
+    let actualEndDate = endDate;
+    let actualPeriod = period;
+
+    // Obtener productos vendidos sin depender de lookup (porque las referencias están rotas)
+    const productSales = await ProductAcquisitionModel.aggregate([
+      {
+        $match: {
+          organizationId,
+          acquisitionDate: { $gte: actualStartDate, $lte: actualEndDate },
+          status: { $in: ["active", "completed"] }, // Solo productos vendidos exitosamente
+        },
+      },
+      {
+        $group: {
+          _id: "$productId",
+          productName: {
+            $first: {
+              $concat: ["Producto ", { $toString: "$productId" }],
+            },
+          },
+          productDescription: {
+            $first: "Producto vendido - ID no encontrado en catálogo",
+          },
+          productPrice: {
+            $first: 0,
+          },
+          productImage: {
+            $first: "",
+          },
+          totalQuantitySold: { $sum: "$quantity" },
+          totalRevenue: {
+            $sum: { $multiply: ["$quantity", "$priceAtAcquisition"] },
+          },
+          totalTransactions: { $sum: 1 },
+          averagePrice: { $avg: "$priceAtAcquisition" },
+          // Información adicional útil
+          productId: { $first: "$productId" },
+          sampleDealId: { $first: "$dealId" },
+        },
+      },
+      {
+        $sort: { totalQuantitySold: -1 }, // Ordenar por cantidad vendida
+      },
+      {
+        $limit: parseInt(limit as string),
+      },
+    ]);
+
+    console.log("🔍 [TopProducts] Product sales results:", productSales);
+
+    // Debug: Revisar algunos registros de ProductAcquisition para entender la estructura
+    const sampleRecords = await ProductAcquisitionModel.find({
+      organizationId,
+      acquisitionDate: { $gte: actualStartDate, $lte: actualEndDate },
+    })
+      .limit(3)
+      .lean();
+    console.log(
+      "🔍 [TopProducts] Sample ProductAcquisition records:",
+      JSON.stringify(sampleRecords, null, 2)
+    );
+
+    // Debug: Verificar si hay productos en la colección products
+    const totalProducts = await ProductModel.countDocuments({
+      organizationId,
+    });
+    console.log(
+      "🔍 [TopProducts] Total products in collection:",
+      totalProducts
+    );
+
+    // Debug: Muestra de productos
+    const sampleProducts = await ProductModel.find({
+      organizationId,
+    })
+      .limit(2)
+      .lean();
+    console.log(
+      "🔍 [TopProducts] Sample products:",
+      JSON.stringify(sampleProducts, null, 2)
+    );
+
+    // También obtener top por revenue
+    const topByRevenue = await ProductAcquisitionModel.aggregate([
+      {
+        $match: {
+          organizationId,
+          acquisitionDate: { $gte: actualStartDate, $lte: actualEndDate },
+          status: { $in: ["active", "completed"] },
+        },
+      },
+      {
+        $group: {
+          _id: "$productId",
+          productName: {
+            $first: {
+              $concat: ["Producto ", { $toString: "$productId" }],
+            },
+          },
+          productDescription: {
+            $first: "Producto vendido - ID no encontrado en catálogo",
+          },
+          productPrice: {
+            $first: 0,
+          },
+          productImage: {
+            $first: "",
+          },
+          totalQuantitySold: { $sum: "$quantity" },
+          totalRevenue: {
+            $sum: { $multiply: ["$quantity", "$priceAtAcquisition"] },
+          },
+          totalTransactions: { $sum: 1 },
+          averagePrice: { $avg: "$priceAtAcquisition" },
+          // Información adicional útil
+          productId: { $first: "$productId" },
+          sampleDealId: { $first: "$dealId" },
+        },
+      },
+      {
+        $sort: { totalRevenue: -1 }, // Ordenar por revenue
+      },
+      {
+        $limit: parseInt(limit as string),
+      },
+    ]);
+
+    // Calcular descripción del período
+    let periodDescription: string;
+    if (period === "previous") {
+      const monthNames = [
+        "Enero",
+        "Febrero",
+        "Marzo",
+        "Abril",
+        "Mayo",
+        "Junio",
+        "Julio",
+        "Agosto",
+        "Septiembre",
+        "Octubre",
+        "Noviembre",
+        "Diciembre",
+      ];
+      const previousMonth = new Date();
+      previousMonth.setMonth(previousMonth.getMonth() - 1);
+      periodDescription = `Último mes (${monthNames[previousMonth.getMonth()]} ${previousMonth.getFullYear()})`;
+    } else {
+      periodDescription = "Últimos 12 meses";
+    }
+
+    console.log("🔍 [TopProducts] Period description:", periodDescription);
+    console.log("🔍 [TopProducts] Date range used:", {
+      actualStartDate,
+      actualEndDate,
+    });
+
+    const response = {
+      period: actualPeriod,
+      month: periodDescription,
+      year: new Date().getFullYear(),
+      startDate: actualStartDate,
+      endDate: actualEndDate,
+      topByQuantity: productSales,
+      topByRevenue: topByRevenue,
+      summary: {
+        totalProducts: productSales.length,
+        totalQuantitySold: productSales.reduce(
+          (sum, item) => sum + item.totalQuantitySold,
+          0
+        ),
+        totalRevenue: productSales.reduce(
+          (sum, item) => sum + item.totalRevenue,
+          0
+        ),
+      },
+    };
+
+    res.status(200).json(response);
+  } catch (error) {
+    console.error("Error obteniendo productos más vendidos:", error);
+    res.status(500).json({ message: "Error en el servidor" });
+  }
+};
+
+/**
+ * Función temporal para crear datos de prueba de ProductAcquisition
+ * SOLO PARA DESARROLLO - REMOVER EN PRODUCCIÓN
+ */
+export const createTestProductAcquisitions = async (
+  req: Request,
+  res: Response
+) => {
+  if (!req.user) {
+    res.status(401).json({ message: "Usuario no autenticado" });
+    return;
+  }
+
+  const { organizationId } = req.user;
+
+  try {
+    // Generar ObjectIds válidos para los datos de prueba
+    const testClientId1 = new mongoose.Types.ObjectId();
+    const testClientId2 = new mongoose.Types.ObjectId();
+    const testProductId1 = new mongoose.Types.ObjectId();
+    const testProductId2 = new mongoose.Types.ObjectId();
+
+    // Primero crear productos de prueba
+    const testProducts = [
+      {
+        _id: testProductId1,
+        name: "Camiseta Premium",
+        description: "Camiseta de alta calidad 100% algodón",
+        unitPrice: 100,
+        organizationId,
+        userId: req.user._id,
+      },
+      {
+        _id: testProductId2,
+        name: "Pantalón Ejecutivo",
+        description: "Pantalón formal para oficina",
+        unitPrice: 150,
+        organizationId,
+        userId: req.user._id,
+      },
+    ];
+
+    // Insertar productos de prueba
+    await ProductModel.insertMany(testProducts);
+
+    // Datos de prueba
+    const testData = [
+      {
+        organizationId,
+        clientId: testClientId1,
+        productId: testProductId1,
+        quantity: 5,
+        priceAtAcquisition: 100,
+        acquisitionDate: new Date(),
+        status: "active",
+        notes: "Producto de prueba 1 - Camiseta",
+        userId: req.user._id,
+      },
+      {
+        organizationId,
+        clientId: testClientId2,
+        productId: testProductId2,
+        quantity: 3,
+        priceAtAcquisition: 150,
+        acquisitionDate: new Date(),
+        status: "completed",
+        notes: "Producto de prueba 2 - Pantalón",
+        userId: req.user._id,
+      },
+      {
+        organizationId,
+        clientId: testClientId1,
+        productId: testProductId1,
+        quantity: 2,
+        priceAtAcquisition: 95,
+        acquisitionDate: new Date(),
+        status: "active",
+        notes: "Producto de prueba 1 - Camiseta (segunda compra)",
+        userId: req.user._id,
+      },
+    ];
+
+    const results = await ProductAcquisitionModel.insertMany(testData);
+
+    res.status(200).json({
+      message: "Datos de prueba creados exitosamente",
+      productsCreated: testProducts.length,
+      acquisitionsCreated: results.length,
+      data: {
+        products: testProducts,
+        acquisitions: results,
+      },
+    });
+  } catch (error) {
+    console.error("Error creando datos de prueba:", error);
     res.status(500).json({ message: "Error en el servidor" });
   }
 };
