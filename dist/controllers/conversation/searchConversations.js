@@ -18,7 +18,6 @@ const searchConversations = (req, res) => __awaiter(void 0, void 0, void 0, func
     var _a;
     const { query } = req.query;
     const organizationId = (_a = req.user) === null || _a === void 0 ? void 0 : _a.organizationId;
-    console.log(req.query);
     if (!query) {
         return res.status(400).json({
             success: false,

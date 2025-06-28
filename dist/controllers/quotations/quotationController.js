@@ -137,6 +137,16 @@ const createQuotation = (req, res) => __awaiter(void 0, void 0, void 0, function
     const userId = (_a = req.user) === null || _a === void 0 ? void 0 : _a._id;
     const organizationId = (_b = req.user) === null || _b === void 0 ? void 0 : _b.organizationId;
     try {
+        // search for quotation number
+        const quotationNumber = yield QuotationModel_1.default.findOne({
+            organizationId,
+            quotationNumber: req.body.quotationNumber,
+        });
+        if (quotationNumber) {
+            return res
+                .status(400)
+                .json({ message: "Quotation number already exists" });
+        }
         const formatedQuotation = {
             items: req.body.items,
             contactId: req.body.contact.id,

@@ -6,6 +6,7 @@ import {
   verifyToken as verifyT,
   firebaseLogin,
   firebaseRegister,
+  logoutAllDevices,
 } from "../controllers/auth/authController";
 import { verifyToken } from "../middlewares/authMiddleware";
 
@@ -16,6 +17,7 @@ router.post("/login", login);
 router.post("/register", register);
 router.post("/verify-token", verifyToken, verifyT);
 router.post("/refresh", verifyToken, refreshToken);
+router.post("/logout-all", verifyToken, logoutAllDevices);
 
 // Endpoints para autenticación con Firebase (separados)
 router.post("/firebase-login", firebaseLogin);

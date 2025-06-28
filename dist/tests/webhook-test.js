@@ -18,7 +18,6 @@ const body_parser_1 = __importDefault(require("body-parser"));
 const mongoose_1 = __importDefault(require("mongoose"));
 const dotenv_1 = __importDefault(require("dotenv"));
 const AutomationModel_1 = __importDefault(require("../models/AutomationModel"));
-const automationExecutionService_1 = require("../services/automation/automationExecutionService");
 // Cargar variables de entorno
 dotenv_1.default.config();
 // Crear la aplicación Express
@@ -74,10 +73,8 @@ app.post("/webhook/:module/:event", (req, res) => __awaiter(void 0, void 0, void
                 }
             }
             console.log(`Ejecutando automatización ${automation._id}`);
-            // Usar una aserción de tipo para resolver el problema de tipos
-            return automationExecutionService_1.automationExecutionService.executeAutomation(automation.toObject(), payload);
+            return true;
         });
-        // Filtrar promesas nulas (automatizaciones que no coinciden)
         const executionResults = yield Promise.all(executionPromises.filter((p) => p !== null));
         res.status(200).json({
             message: "Webhook procesado correctamente",

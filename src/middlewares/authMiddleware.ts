@@ -3,6 +3,8 @@ import jwt from "jsonwebtoken";
 import dotenv from "dotenv";
 import { IAuthRequest } from "../types/index";
 import { IUserPayload } from "../models/UserModel";
+import UserModel from "../models/UserModel";
+import OrganizationModel from "../models/OrganizationModel";
 
 dotenv.config();
 
@@ -22,6 +24,7 @@ export const generateToken = (
     organizationId: user.organizationId,
     rememberMe,
     role: user.role || "",
+    iat: Math.floor(Date.now() / 1000), // Añadir timestamp de emisión
   };
 
   // Ajustar la expiración según "rememberMe"
@@ -34,7 +37,7 @@ export const generateToken = (
 };
 
 // Middleware para verificar el token JWT
-export const verifyToken = (
+export const verifyToken = async (
   req: IAuthRequest,
   res: Response,
   next: NextFunction
@@ -52,7 +55,43 @@ export const verifyToken = (
 
   try {
     const decoded = jwt.verify(token, secretKey) as IUserPayload;
-    req.user = decoded; // Se asigna la info decodificada a req.user
+
+    // Verificar si el usuario existe y sigue activo
+    const user = await UserModel.findById(decoded._id);
+    if (!user) {
+      return res.status(401).json({
+        message: "Usuario no encontrado",
+        code: "USER_NOT_FOUND",
+      });
+    }
+
+    // Verificar si el usuario sigue siendo parte de la organización
+    const organization = await OrganizationModel.findById(
+      decoded.organizationId
+    );
+    if (
+      !organization ||
+      !organization.employees.includes(user._id.toString())
+    ) {
+      return res.status(401).json({
+        message: "Usuario no pertenece a la organización",
+        code: "USER_NOT_IN_ORGANIZATION",
+      });
+    }
+
+    // Verificar si el token fue emitido antes del último logout global
+    if (
+      user.lastLogoutAt &&
+      decoded.iat &&
+      decoded.iat * 1000 < user.lastLogoutAt.getTime()
+    ) {
+      return res.status(401).json({
+        message: "Sesión cerrada globalmente",
+        code: "GLOBAL_LOGOUT",
+      });
+    }
+
+    req.user = decoded;
     next();
   } catch (error: any) {
     console.log("error en verifyToken", error);

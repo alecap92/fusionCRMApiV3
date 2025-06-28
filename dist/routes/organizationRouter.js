@@ -10,6 +10,7 @@ const router = (0, express_1.Router)();
 const storage = multer_1.default.memoryStorage();
 const upload = (0, multer_1.default)({ storage });
 router.get("/", organizationController_1.getOrganization);
+router.get("/current", organizationController_1.getOrganizationById);
 router.get("/:id", organizationController_1.getOrganizationById);
 router.put("/", organizationController_1.updateOrganization);
 router.post("/upload-logo", upload.single("logo"), organizationController_1.uploadLogo);

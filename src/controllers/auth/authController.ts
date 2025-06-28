@@ -5,6 +5,7 @@ import UserModel, { IUser } from "../../models/UserModel";
 import OrganizationModel from "../../models/OrganizationModel";
 import { generateToken } from "../../middlewares/authMiddleware";
 import { auth } from "../../config/firebase";
+import LogModel from "../../models/LogModel";
 
 export const login = async (req: Request, res: Response) => {
   try {
@@ -245,6 +246,99 @@ export const refreshToken = async (req: IAuthRequest, res: Response) => {
   } catch (error) {
     console.error("Error en refreshToken:", error);
     return res.status(500).json({ message: "Error en el servidor" });
+  }
+};
+
+export const logoutAllDevices = async (req: IAuthRequest, res: Response) => {
+  try {
+    const userId = req.user?._id;
+    const organizationId = req.user?.organizationId;
+
+    console.log("[LogoutAll] Iniciando proceso con:", {
+      userId,
+      organizationId,
+    });
+
+    if (!userId || !organizationId) {
+      console.log("[LogoutAll] Error: Usuario no autenticado");
+      return res.status(401).json({
+        success: false,
+        message: "Usuario no autenticado",
+        summary: null,
+      });
+    }
+
+    // Obtener la organización y sus empleados
+    const organization = await OrganizationModel.findById(organizationId);
+
+    console.log("[LogoutAll] Organización encontrada:", {
+      organizationId,
+      employeesCount: organization?.employees?.length || 0,
+    });
+
+    if (!organization) {
+      console.log("[LogoutAll] Error: Organización no encontrada");
+      return res.status(404).json({
+        success: false,
+        message: "Organización no encontrada",
+        summary: null,
+      });
+    }
+
+    // Obtener todos los usuarios activos de la organización
+    const users = await UserModel.find({
+      _id: { $in: organization.employees },
+      lastLogoutAt: { $exists: false },
+    });
+
+    console.log(`[LogoutAll] Usuarios activos encontrados: ${users.length}`);
+
+    // Actualizar el timestamp de último logout para todos los empleados
+    const currentTime = new Date();
+    const updateResult = await UserModel.updateMany(
+      { _id: { $in: organization.employees } },
+      {
+        lastLogoutAt: currentTime,
+        pushToken: [], // Limpiar tokens de notificación push
+      }
+    );
+
+    console.log("[LogoutAll] Resultado de la actualización:", updateResult);
+
+    // Registrar los resultados
+    const logoutSummary = {
+      totalEmployees: organization.employees.length,
+      activeUsersBeforeLogout: users.length,
+      usersUpdated: updateResult.modifiedCount,
+      timestamp: currentTime,
+      organizationId: organizationId.toString(),
+    };
+
+    console.log("[LogoutAll] Resumen de la operación:", logoutSummary);
+
+    // Guardar el registro de la operación
+    await LogModel.create({
+      type: "LOGOUT_ALL",
+      data: logoutSummary,
+      userId: userId,
+      organizationId: organizationId,
+      timestamp: currentTime,
+    });
+
+    return res.status(200).json({
+      success: true,
+      message:
+        "Sesión cerrada en todos los dispositivos para todos los empleados exitosamente",
+      summary: logoutSummary,
+    });
+  } catch (error) {
+    console.error("[LogoutAll] Error en logoutAllDevices:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Error en el servidor",
+      summary: null,
+      error: error instanceof Error ? error.message : "Error desconocido",
+    });
   }
 };
 

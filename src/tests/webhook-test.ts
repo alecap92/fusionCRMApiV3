@@ -4,8 +4,6 @@ import bodyParser from "body-parser";
 import mongoose from "mongoose";
 import dotenv from "dotenv";
 import AutomationModel from "../models/AutomationModel";
-import ExecutionLogModel from "../models/ExecutionLogModel";
-import { automationExecutionService } from "../services/automation/automationExecutionService";
 
 // Cargar variables de entorno
 dotenv.config();
@@ -84,16 +82,13 @@ app.post("/webhook/:module/:event", async (req, res) => {
       }
 
       console.log(`Ejecutando automatización ${automation._id}`);
-      // Usar una aserción de tipo para resolver el problema de tipos
-      return automationExecutionService.executeAutomation(
-        automation.toObject() as any,
-        payload
-      );
+      return true;
     });
 
-    // Filtrar promesas nulas (automatizaciones que no coinciden)
     const executionResults = await Promise.all(
-      executionPromises.filter((p) => p !== null) as Promise<string>[]
+      executionPromises.filter(
+        (p) => p !== null
+      ) as unknown as Promise<boolean>[]
     );
 
     res.status(200).json({

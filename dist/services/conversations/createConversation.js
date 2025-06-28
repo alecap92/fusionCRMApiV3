@@ -81,7 +81,6 @@ const reopenConversationIfClosed = (conversation) => __awaiter(void 0, void 0, v
                 value: `Reabierta automáticamente por mensaje entrante - ${new Date().toISOString()}`,
             });
             yield conversation.save();
-            console.log(`Conversación ${conversation._id} reabierta automáticamente`);
             return true;
         }
         return false;

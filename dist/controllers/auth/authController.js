@@ -23,12 +23,13 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.firebaseRegister = exports.firebaseLogin = exports.refreshToken = exports.verifyToken = exports.register = exports.login = void 0;
+exports.firebaseRegister = exports.firebaseLogin = exports.logoutAllDevices = exports.refreshToken = exports.verifyToken = exports.register = exports.login = void 0;
 const bcrypt_1 = __importDefault(require("bcrypt"));
 const UserModel_1 = __importDefault(require("../../models/UserModel"));
 const OrganizationModel_1 = __importDefault(require("../../models/OrganizationModel"));
 const authMiddleware_1 = require("../../middlewares/authMiddleware");
 const firebase_1 = require("../../config/firebase");
+const LogModel_1 = __importDefault(require("../../models/LogModel"));
 const login = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const { email, password, rememberMe } = req.body;
@@ -220,6 +221,84 @@ const refreshToken = (req, res) => __awaiter(void 0, void 0, void 0, function* (
     }
 });
 exports.refreshToken = refreshToken;
+const logoutAllDevices = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a, _b, _c;
+    try {
+        const userId = (_a = req.user) === null || _a === void 0 ? void 0 : _a._id;
+        const organizationId = (_b = req.user) === null || _b === void 0 ? void 0 : _b.organizationId;
+        console.log("[LogoutAll] Iniciando proceso con:", {
+            userId,
+            organizationId,
+        });
+        if (!userId || !organizationId) {
+            console.log("[LogoutAll] Error: Usuario no autenticado");
+            return res.status(401).json({
+                success: false,
+                message: "Usuario no autenticado",
+                summary: null,
+            });
+        }
+        // Obtener la organización y sus empleados
+        const organization = yield OrganizationModel_1.default.findById(organizationId);
+        console.log("[LogoutAll] Organización encontrada:", {
+            organizationId,
+            employeesCount: ((_c = organization === null || organization === void 0 ? void 0 : organization.employees) === null || _c === void 0 ? void 0 : _c.length) || 0,
+        });
+        if (!organization) {
+            console.log("[LogoutAll] Error: Organización no encontrada");
+            return res.status(404).json({
+                success: false,
+                message: "Organización no encontrada",
+                summary: null,
+            });
+        }
+        // Obtener todos los usuarios activos de la organización
+        const users = yield UserModel_1.default.find({
+            _id: { $in: organization.employees },
+            lastLogoutAt: { $exists: false },
+        });
+        console.log(`[LogoutAll] Usuarios activos encontrados: ${users.length}`);
+        // Actualizar el timestamp de último logout para todos los empleados
+        const currentTime = new Date();
+        const updateResult = yield UserModel_1.default.updateMany({ _id: { $in: organization.employees } }, {
+            lastLogoutAt: currentTime,
+            pushToken: [], // Limpiar tokens de notificación push
+        });
+        console.log("[LogoutAll] Resultado de la actualización:", updateResult);
+        // Registrar los resultados
+        const logoutSummary = {
+            totalEmployees: organization.employees.length,
+            activeUsersBeforeLogout: users.length,
+            usersUpdated: updateResult.modifiedCount,
+            timestamp: currentTime,
+            organizationId: organizationId.toString(),
+        };
+        console.log("[LogoutAll] Resumen de la operación:", logoutSummary);
+        // Guardar el registro de la operación
+        yield LogModel_1.default.create({
+            type: "LOGOUT_ALL",
+            data: logoutSummary,
+            userId: userId,
+            organizationId: organizationId,
+            timestamp: currentTime,
+        });
+        return res.status(200).json({
+            success: true,
+            message: "Sesión cerrada en todos los dispositivos para todos los empleados exitosamente",
+            summary: logoutSummary,
+        });
+    }
+    catch (error) {
+        console.error("[LogoutAll] Error en logoutAllDevices:", error);
+        return res.status(500).json({
+            success: false,
+            message: "Error en el servidor",
+            summary: null,
+            error: error instanceof Error ? error.message : "Error desconocido",
+        });
+    }
+});
+exports.logoutAllDevices = logoutAllDevices;
 // Método para LOGIN con Firebase (solo usuarios existentes)
 const firebaseLogin = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {

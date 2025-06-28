@@ -15,6 +15,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.advancedSearch = void 0;
 const ContactModel_1 = __importDefault(require("../../models/ContactModel"));
 const DealsModel_1 = __importDefault(require("../../models/DealsModel"));
+const MessageModel_1 = __importDefault(require("../../models/MessageModel"));
 const advancedSearch = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     var _a;
     try {
@@ -60,7 +61,19 @@ const advancedSearch = (req, res) => __awaiter(void 0, void 0, void 0, function*
             organizationId,
             title: { $regex: regexRaw },
         });
-        return res.status(200).json({ contacts, deals });
+        // Buscar conversaciones/mensajes
+        const conversations = yield MessageModel_1.default.find({
+            $or: [
+                { from: { $regex: regex } },
+                { to: { $regex: regex } },
+                { message: { $regex: regexRaw } },
+                { possibleName: { $regex: regexRaw } },
+            ],
+            organization: organizationId,
+        })
+            .limit(limitNumber)
+            .sort({ timestamp: -1 });
+        return res.status(200).json({ contacts, deals, conversations });
     }
     catch (error) {
         console.error("Error en advancedSearch:", error);

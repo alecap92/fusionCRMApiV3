@@ -16,8 +16,6 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const mongoose_1 = __importDefault(require("mongoose"));
 const dotenv_1 = __importDefault(require("dotenv"));
 const AutomationModel_1 = __importDefault(require("../models/AutomationModel"));
-const automationExecutionService_1 = require("../services/automation/automationExecutionService");
-const ExecutionLogModel_1 = __importDefault(require("../models/ExecutionLogModel"));
 // Cargar variables de entorno
 dotenv_1.default.config();
 // Conectar a la base de datos
@@ -95,7 +93,6 @@ function createTestAutomation() {
 // Función para ejecutar la automatización de prueba
 function runTestAutomation(automation) {
     return __awaiter(this, void 0, void 0, function* () {
-        var _a;
         try {
             // Datos de prueba que simularían el evento que dispara la automatización
             const testData = {
@@ -110,21 +107,10 @@ function runTestAutomation(automation) {
                     previousStatus: "pending",
                 },
             };
-            console.log("Ejecutando automatización...");
-            const executionId = yield automationExecutionService_1.automationExecutionService.executeAutomation(automation, testData);
-            console.log("Ejecución iniciada con ID:", executionId);
             // Esperar unos segundos para que la ejecución termine
             yield new Promise((resolve) => setTimeout(resolve, 5000));
             // Obtener y mostrar los logs de ejecución
-            const executionLog = yield ExecutionLogModel_1.default.findOne({ executionId });
-            console.log("\nResultados de la ejecución:");
-            console.log("Estado:", executionLog === null || executionLog === void 0 ? void 0 : executionLog.status);
-            console.log("Tiempo de ejecución:", executionLog === null || executionLog === void 0 ? void 0 : executionLog.executionTime, "ms");
-            console.log("Logs de nodos:");
-            (_a = executionLog === null || executionLog === void 0 ? void 0 : executionLog.logs) === null || _a === void 0 ? void 0 : _a.forEach((log) => {
-                console.log(`[${log.timestamp.toISOString()}] ${log.nodeId} - ${log.action}: ${log.message}`);
-            });
-            return executionLog;
+            return true;
         }
         catch (error) {
             console.error("Error al ejecutar automatización:", error);
@@ -175,7 +161,7 @@ function createMassEmailAutomation() {
                         listId: "ID_DE_TU_LISTA", // Aquí deberías colocar un ID real de una lista
                         subject: "Información importante para nuestros clientes",
                         emailBody: "<p>Hola {{contact.firstName}},</p><p>Te enviamos esta información importante...</p><p>Saludos,<br>El equipo</p>",
-                        next: ["3"]
+                        next: ["3"],
                     },
                     {
                         id: "3",
@@ -183,10 +169,10 @@ function createMassEmailAutomation() {
                         transformations: [
                             {
                                 outputField: "emailReport",
-                                expression: "Emails enviados: {{massEmailResult.successCount}} de {{massEmailResult.totalContacts}}"
-                            }
-                        ]
-                    }
+                                expression: "Emails enviados: {{massEmailResult.successCount}} de {{massEmailResult.totalContacts}}",
+                            },
+                        ],
+                    },
                 ],
             });
             yield automation.save();

@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.searchConversations = exports.deleteConversation = exports.getConversationStats = exports.getUnreadMessagesCount = exports.markConversationAsRead = exports.addMessage = exports.changeConversationPipeline = exports.moveConversationStage = exports.updateConversation = exports.getConversationById = exports.getConversationsKanban = exports.getConversations = exports.createConversation = void 0;
+exports.findConversationByPhone = exports.searchConversations = exports.deleteConversation = exports.getConversationStats = exports.getUnreadMessagesCount = exports.markConversationAsRead = exports.addMessage = exports.changeConversationPipeline = exports.moveConversationStage = exports.updateConversation = exports.getConversationById = exports.getConversationsKanban = exports.getConversations = exports.createConversation = void 0;
 // Exportaciones para controladores de conversación
 var createConversation_1 = require("./createConversation");
 Object.defineProperty(exports, "createConversation", { enumerable: true, get: function () { return createConversation_1.createConversation; } });
@@ -22,3 +22,5 @@ var deleteConversation_1 = require("./deleteConversation");
 Object.defineProperty(exports, "deleteConversation", { enumerable: true, get: function () { return deleteConversation_1.deleteConversation; } });
 var searchConversations_1 = require("./searchConversations");
 Object.defineProperty(exports, "searchConversations", { enumerable: true, get: function () { return searchConversations_1.searchConversations; } });
+var findConversationByPhone_1 = require("./findConversationByPhone");
+Object.defineProperty(exports, "findConversationByPhone", { enumerable: true, get: function () { return findConversationByPhone_1.findConversationByPhone; } });

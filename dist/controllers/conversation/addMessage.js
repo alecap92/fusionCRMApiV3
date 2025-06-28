@@ -46,10 +46,7 @@ const addMessage = (req, res) => __awaiter(void 0, void 0, void 0, function* () 
         }
         // Si es un mensaje entrante, verificar si la conversación debe reabrirse
         if (direction === "incoming") {
-            const wasReopened = yield (0, createConversation_1.reopenConversationIfClosed)(conversation);
-            if (wasReopened) {
-                console.log(`Conversación ${conversation._id} fue reabierta automáticamente por mensaje entrante`);
-            }
+            yield (0, createConversation_1.reopenConversationIfClosed)(conversation);
         }
         // Crear el nuevo mensaje
         const newMessage = new MessageModel_1.default({

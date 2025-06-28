@@ -13,6 +13,7 @@ const userSchema = new mongoose_1.Schema({
     pushToken: [String],
     firebaseUid: { type: String, required: false }, // UID de Firebase
     avatar: { type: String, required: false }, // URL del avatar
+    lastLogoutAt: { type: Date, required: false }, // Campo para rastrear el último logout global
     emailSettings: {
         emailAddress: { type: String, required: true },
         imapSettings: {

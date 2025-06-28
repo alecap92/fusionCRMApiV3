@@ -52,6 +52,7 @@ router.delete("/pipelines/:id", pipelineController.deletePipeline);
 router.post("/", conversationController.createConversation);
 router.get("/", conversationController.getConversations);
 router.get("/search", conversationController.searchConversations);
+router.get("/find-by-phone", conversationController.findConversationByPhone);
 router.get("/kanban", conversationController.getConversationsKanban);
 router.get("/stats", conversationController.getConversationStats);
 router.get("/unread", conversationController.getUnreadMessagesCount);

@@ -45,7 +45,7 @@ const itemSchema = new mongoose_1.Schema({
     productId: { type: mongoose_1.Schema.Types.ObjectId, ref: "Product" },
 });
 const quotationSchema = new mongoose_1.Schema({
-    quotationNumber: { type: Number, required: true },
+    quotationNumber: { type: Number, required: true, unique: true },
     name: { type: String, required: true },
     observaciones: { type: String },
     contactId: { type: mongoose_1.Schema.Types.ObjectId, ref: "Contact", required: true },

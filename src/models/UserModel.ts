@@ -38,6 +38,7 @@ export interface IUser extends Document {
   organizationId: string;
   firebaseUid?: string; // UID de Firebase para usuarios autenticados con Firebase
   avatar?: string; // URL del avatar del usuario
+  lastLogoutAt?: Date; // Timestamp del último cierre de sesión global
 }
 
 export interface IUserPayload
@@ -61,6 +62,7 @@ const userSchema = new Schema<IUser>(
     pushToken: [String],
     firebaseUid: { type: String, required: false }, // UID de Firebase
     avatar: { type: String, required: false }, // URL del avatar
+    lastLogoutAt: { type: Date, required: false }, // Campo para rastrear el último logout global
     emailSettings: {
       emailAddress: { type: String, required: true },
       imapSettings: {
