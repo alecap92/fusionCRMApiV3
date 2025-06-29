@@ -67,7 +67,7 @@ export const getConversations = async (
       ) {
         // Agregar información adicional al contacto
         conversationObj.participants.contact.displayInfo = {
-          phone: conversationObj.participants.contact.reference,
+          mobile: conversationObj.participants.contact.reference,
           name: conversationObj.participants.contact.reference, // Usar el teléfono como nombre por defecto
         };
       }
@@ -245,7 +245,7 @@ export const getConversationsKanban = async (
               typeof conversationObj.participants.contact.reference === "string"
             ) {
               conversationObj.participants.contact.displayInfo = {
-                phone: conversationObj.participants.contact.reference,
+                mobile: conversationObj.participants.contact.reference,
                 name: conversationObj.participants.contact.reference,
               };
             }
@@ -319,7 +319,7 @@ export const getConversationsKanban = async (
           typeof conversationObj.participants.contact.reference === "string"
         ) {
           conversationObj.participants.contact.displayInfo = {
-            phone: conversationObj.participants.contact.reference,
+            mobile: conversationObj.participants.contact.reference,
             name: conversationObj.participants.contact.reference,
           };
         }
@@ -453,7 +453,7 @@ export const getConversationById = async (
     ) {
       // Agregar información adicional al contacto
       conversationObj.participants.contact.displayInfo = {
-        phone: conversationObj.participants.contact.reference,
+        mobile: conversationObj.participants.contact.reference,
         name: conversationObj.participants.contact.reference, // Usar el teléfono como nombre por defecto
       };
 

@@ -16,10 +16,7 @@ const enrichChatList = async (chatList: any[], organizationId: string) => {
       try {
         const contactInfo = await ContactModel.findOne({
           organizationId,
-          $or: [
-            { "properties.key": "phone", "properties.value": chat._id },
-            { "properties.key": "mobile", "properties.value": chat._id },
-          ],
+          $or: [{ "properties.key": "mobile", "properties.value": chat._id }],
         }).lean();
 
         const name = [

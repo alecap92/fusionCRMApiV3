@@ -2,20 +2,20 @@ import { Request, Response } from "express";
 import ConversationModel from "../../models/ConversationModel";
 
 export const findConversationByPhone = async (req: Request, res: Response) => {
-  const { phone } = req.query;
+  const { mobile } = req.query;
   const organizationId = req.user?.organizationId;
 
-  if (!phone) {
+  if (!mobile) {
     return res.status(400).json({
       success: false,
-      message: "El parámetro phone es requerido",
+      message: "El parámetro mobile es requerido",
     });
   }
 
   try {
     // Buscar conversación por número de teléfono
     const conversation = await ConversationModel.findOne({
-      "participants.contact.reference": phone,
+      "participants.contact.reference": mobile,
       organization: organizationId,
     })
       .populate("assignedTo", "name email profilePicture")
@@ -38,7 +38,7 @@ export const findConversationByPhone = async (req: Request, res: Response) => {
       typeof conversationObj.participants.contact.reference === "string"
     ) {
       conversationObj.participants.contact.displayInfo = {
-        phone: conversationObj.participants.contact.reference,
+        mobile: conversationObj.participants.contact.reference,
         name: conversationObj.participants.contact.reference,
       };
     }

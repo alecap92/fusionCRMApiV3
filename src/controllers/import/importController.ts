@@ -89,7 +89,7 @@ export const importContacts = async (req: Request, res: Response) => {
       for (const prop of properties) {
         if (prop.key === "email") {
           email = prop.value;
-        } else if (prop.key === "mobile" || prop.key === "cellphone") {
+        } else if (prop.key === "mobile") {
           mobile = prop.value;
         }
       }
@@ -113,10 +113,8 @@ export const importContacts = async (req: Request, res: Response) => {
       ) {
         existingContact = await ContactModel.findOne({
           organizationId,
-          $or: [
-            { "properties.key": "mobile", "properties.value": mobile },
-            { "properties.key": "cellphone", "properties.value": mobile },
-          ],
+          "properties.key": "mobile",
+          "properties.value": mobile,
         });
       }
 

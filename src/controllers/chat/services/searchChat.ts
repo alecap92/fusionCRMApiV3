@@ -48,10 +48,7 @@ export const searchChats = async (req: Request, res: Response) => {
       messagesMatches.map(async (match) => {
         const contactInfo = await ContactModel.findOne({
           organizationId,
-          $or: [
-            { "properties.key": "phone", "properties.value": match._id },
-            { "properties.key": "cellphone", "properties.value": match._id },
-          ],
+          $or: [{ "properties.key": "mobile", "properties.value": match._id }],
         })
           .lean()
           .exec();
