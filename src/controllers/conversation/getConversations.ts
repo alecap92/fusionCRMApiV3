@@ -139,10 +139,22 @@ export const getConversationsKanban = async (
       assignedTo,
       tags,
       search,
-      page = 1,
-      limit = 10,
-      stageId, // Nuevo parámetro para cargar conversaciones de una etapa específica
+      page = "1",
+      limit = "50",
+      stageId,
     } = req.query;
+
+    // Convertir y validar los números
+    const pageNumber = Math.max(1, parseInt(page as string));
+    const limitNumber = Math.max(50, parseInt(limit as string));
+
+    console.log("DEBUG Kanban Request:", {
+      pipelineId,
+      stageId,
+      pageNumber,
+      limitNumber,
+      organizationId,
+    });
 
     // Si no se proporciona un pipelineId, usar el predeterminado
     let pipeline;
@@ -157,6 +169,11 @@ export const getConversationsKanban = async (
         isDefault: true,
       });
     }
+
+    console.log("DEBUG Pipeline found:", {
+      pipelineId: pipeline?._id,
+      stagesCount: pipeline?.stages?.length,
+    });
 
     if (!pipeline) {
       return res.status(404).json({
@@ -207,10 +224,7 @@ export const getConversationsKanban = async (
       baseQueryConditions.title = { $regex: search, $options: "i" };
     }
 
-    const pageNumber = parseInt(page as string, 10);
-    const limitNumber = parseInt(limit as string, 10);
-
-    // Si se especifica un stageId, solo cargar conversaciones para esa etapa (paginación)
+    // Si se especifica un stageId, solo cargar conversaciones para esa etapa
     if (stageId) {
       const stageIndex = pipeline.stages.findIndex(
         (stage: any) => stage._id.toString() === stageId
@@ -224,6 +238,14 @@ export const getConversationsKanban = async (
 
         const skip = (pageNumber - 1) * limitNumber;
 
+        console.log("DEBUG Stage query:", {
+          stageId,
+          stageIndex,
+          skip,
+          limitNumber,
+          conditions: stageQueryConditions,
+        });
+
         const conversations = await Conversation.find(stageQueryConditions)
           .sort({ lastMessageTimestamp: -1 })
           .skip(skip)
@@ -233,6 +255,13 @@ export const getConversationsKanban = async (
 
         const total = await Conversation.countDocuments(stageQueryConditions);
         const pages = Math.ceil(total / limitNumber);
+
+        console.log("DEBUG Query results:", {
+          found: conversations.length,
+          total,
+          pages,
+          hasMore: pageNumber < pages,
+        });
 
         // Procesar las conversaciones
         const processedConversations = conversations.map(
