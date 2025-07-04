@@ -17,7 +17,6 @@ export const sendCustomMessage = async (
   res: Response
 ): Promise<Response> => {
   try {
-    console.log("[SEND_CUSTOM] Iniciando envío de mensaje personalizado");
     const { message, to, type: messageType, mediaUrl, file } = req.body;
 
     console.log(`[SEND_CUSTOM] Datos recibidos:
