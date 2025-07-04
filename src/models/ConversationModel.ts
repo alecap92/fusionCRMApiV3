@@ -1,4 +1,4 @@
-import { Schema, model, Document } from "mongoose";
+import { Schema, Types, model } from "mongoose";
 
 interface IParticipant {
   user: {
@@ -19,13 +19,13 @@ interface IMetadata {
 interface IAutomationSettings {
   isPaused: boolean;
   pausedUntil?: Date;
-  pausedBy?: Schema.Types.ObjectId; // Usuario que pausó las automatizaciones
-  pauseReason?: string; // "30m", "1h", "3h", "6h", "12h", "1d", "forever"
-  lastAutomationTriggered?: Date; // Para evitar disparos múltiples
+  pausedBy: "system" | Types.ObjectId | undefined;
+  pauseReason?: string;
+  lastAutomationTriggered?: Date;
   automationHistory: Array<{
-    automationType: string; // "greeting", "follow_up", "reminder", etc.
+    automationType: string;
     triggeredAt: Date;
-    triggeredBy?: Schema.Types.ObjectId; // Usuario o "system"
+    triggeredBy: "system" | Types.ObjectId | undefined;
   }>;
 }
 
@@ -71,14 +71,40 @@ const metadataSchema = new Schema<IMetadata>({
 
 const automationHistorySchema = new Schema({
   automationType: { type: String, required: true },
-  triggeredAt: { type: Date, required: true, default: Date.now },
-  triggeredBy: { type: Schema.Types.ObjectId, ref: "User" },
+  triggeredAt: { type: Date, required: true },
+  triggeredBy: {
+    type: Schema.Types.Mixed,
+    ref: "User",
+    validate: {
+      validator: function (v: any) {
+        return (
+          v === "system" ||
+          v instanceof Types.ObjectId ||
+          typeof v === "undefined"
+        );
+      },
+      message: "triggeredBy debe ser 'system' o un ObjectId válido",
+    },
+  },
 });
 
 const automationSettingsSchema = new Schema<IAutomationSettings>({
   isPaused: { type: Boolean, default: false },
   pausedUntil: { type: Date },
-  pausedBy: { type: Schema.Types.ObjectId, ref: "User" },
+  pausedBy: {
+    type: Schema.Types.Mixed,
+    ref: "User",
+    validate: {
+      validator: function (v: any) {
+        return (
+          v === "system" ||
+          v instanceof Types.ObjectId ||
+          typeof v === "undefined"
+        );
+      },
+      message: "pausedBy debe ser 'system' o un ObjectId válido",
+    },
+  },
   pauseReason: {
     type: String,
     enum: ["30m", "1h", "3h", "6h", "12h", "1d", "forever"],

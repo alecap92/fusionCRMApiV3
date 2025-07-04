@@ -48,65 +48,125 @@ export const getConversations = async (
     const limitNumber = parseInt(limit as string, 10);
     const skip = (pageNumber - 1) * limitNumber;
 
+    /*
+     * 1. Traer las conversaciones de forma "lean" para reducir overhead.
+     * 2. Obtener sólo los campos necesarios.
+     */
     const conversations = await Conversation.find(queryConditions)
       .sort({ lastMessageTimestamp: -1 })
       .skip(skip)
       .limit(limitNumber)
-      .populate("lastMessage")
-      .populate("assignedTo", "name email firstName lastName");
+      .select(
+        "title participants lastMessageTimestamp pipeline currentStage assignedTo isResolved tags unreadCount"
+      )
+      .populate("assignedTo", "name email firstName lastName")
+      .lean();
 
-    // Procesar las conversaciones para manejar los casos donde participants.contact.reference es string
+    // Si no hay conversaciones, responder inmediatamente
+    if (!conversations.length) {
+      return res.status(200).json({
+        success: true,
+        data: [],
+        pagination: {
+          total: 0,
+          page: pageNumber,
+          limit: limitNumber,
+          pages: 0,
+        },
+      });
+    }
+
+    /* ---------- Contactos en lote ---------- */
+    const references: string[] = [
+      ...new Set(
+        conversations
+          .map((c: any) => c?.participants?.contact?.reference)
+          .filter(Boolean)
+      ),
+    ];
+
+    const contactsRaw = await ContactModel.find({
+      organizationId,
+      $or: [
+        {
+          "properties.key": "mobile",
+          "properties.value": { $in: references },
+        },
+        {
+          "properties.key": "phone",
+          "properties.value": { $in: references },
+        },
+      ],
+    })
+      .select("properties")
+      .lean();
+
+    const contactsByPhone: Record<string, any> = {};
+    for (const contact of contactsRaw) {
+      if (!contact?.properties) continue;
+      for (const prop of contact.properties) {
+        if (
+          (prop.key === "mobile" || prop.key === "phone") &&
+          references.includes(prop.value)
+        ) {
+          contactsByPhone[prop.value] = contact;
+        }
+      }
+    }
+
+    /* ---------- Último mensaje en lote ---------- */
+    const conversationIds = conversations.map((c: any) => c._id);
+    const lastMessagesAgg = await Message.aggregate([
+      { $match: { conversation: { $in: conversationIds } } },
+      { $sort: { timestamp: -1 } },
+      {
+        $group: {
+          _id: "$conversation",
+          doc: { $first: "$$ROOT" },
+        },
+      },
+    ]);
+
+    const lastMessagesByConversation: Record<string, any> = {};
+    for (const lm of lastMessagesAgg) {
+      lastMessagesByConversation[lm._id.toString()] = lm.doc;
+    }
+
+    /* ---------- Construir respuesta ---------- */
     const processedConversations = conversations.map((conversation: any) => {
-      const conversationObj = conversation.toObject();
+      const reference = conversation?.participants?.contact?.reference;
+      const contact = reference ? contactsByPhone[reference] : null;
 
-      // Procesar el participante contacto si tiene un número de teléfono como referencia
-      if (
-        conversationObj.participants &&
-        conversationObj.participants.contact &&
-        typeof conversationObj.participants.contact.reference === "string"
-      ) {
-        // Agregar información adicional al contacto
-        conversationObj.participants.contact.displayInfo = {
-          mobile: conversationObj.participants.contact.reference,
-          name: conversationObj.participants.contact.reference, // Usar el teléfono como nombre por defecto
+      // Display info de contacto
+      if (reference) {
+        const findProp = (key: string) =>
+          contact?.properties?.find((p: any) => p.key === key)?.value;
+
+        conversation.participants.contact.displayInfo = {
+          mobile: reference,
+          name: findProp("firstName") || reference,
+          lastName: findProp("lastName") || "",
+          email: findProp("email") || "",
+          position: findProp("position") || "",
+          contactId: contact?._id || null,
         };
       }
 
-      // Add last message timestamp
-      conversationObj.lastMessageTimestamp =
-        conversationObj.lastMessage?.timestamp;
+      // Añadir mobile helper y último mensaje
+      conversation.mobile = reference;
+      const lm = lastMessagesByConversation[conversation._id.toString()];
+      conversation.lastMessage = lm || null;
+      conversation.lastMessageTimestamp =
+        lm?.timestamp || conversation.lastMessageTimestamp;
 
-      conversationObj.mobile = conversationObj.participants.contact.reference;
-
-      return conversationObj;
+      return conversation;
     });
 
     const total = await Conversation.countDocuments(queryConditions);
 
-    // Obtener el último mensaje para cada conversación
-    const conversationsWithLastMessage = await Promise.all(
-      processedConversations.map(async (conversation) => {
-        const lastMessage = await Message.findOne({
-          $or: [
-            {
-              from: conversation.participants.contact.reference,
-            },
-            {
-              to: conversation.participants.contact.reference,
-            },
-          ],
-        }).sort({ timestamp: -1 });
-
-        return {
-          ...conversation,
-          lastMessage: lastMessage || null,
-        };
-      })
-    );
-
     return res.status(200).json({
       success: true,
-      data: conversationsWithLastMessage,
+      data: processedConversations,
       pagination: {
         total,
         page: pageNumber,
@@ -148,14 +208,6 @@ export const getConversationsKanban = async (
     const pageNumber = Math.max(1, parseInt(page as string));
     const limitNumber = Math.max(50, parseInt(limit as string));
 
-    console.log("DEBUG Kanban Request:", {
-      pipelineId,
-      stageId,
-      pageNumber,
-      limitNumber,
-      organizationId,
-    });
-
     // Si no se proporciona un pipelineId, usar el predeterminado
     let pipeline;
     if (pipelineId) {
@@ -169,11 +221,6 @@ export const getConversationsKanban = async (
         isDefault: true,
       });
     }
-
-    console.log("DEBUG Pipeline found:", {
-      pipelineId: pipeline?._id,
-      stagesCount: pipeline?.stages?.length,
-    });
 
     if (!pipeline) {
       return res.status(404).json({
@@ -238,44 +285,64 @@ export const getConversationsKanban = async (
 
         const skip = (pageNumber - 1) * limitNumber;
 
-        console.log("DEBUG Stage query:", {
-          stageId,
-          stageIndex,
-          skip,
-          limitNumber,
-          conditions: stageQueryConditions,
-        });
-
         const conversations = await Conversation.find(stageQueryConditions)
           .sort({ lastMessageTimestamp: -1 })
           .skip(skip)
           .limit(limitNumber)
           .populate("lastMessage")
-          .populate("assignedTo", "name email profilePicture");
+          .populate("assignedTo", "firstName lastName email profilePicture");
 
         const total = await Conversation.countDocuments(stageQueryConditions);
         const pages = Math.ceil(total / limitNumber);
 
-        console.log("DEBUG Query results:", {
-          found: conversations.length,
-          total,
-          pages,
-          hasMore: pageNumber < pages,
-        });
-
         // Procesar las conversaciones
         const processedConversations = conversations.map(
-          (conversation: any) => {
+          async (conversation: any) => {
             const conversationObj = conversation.toObject();
 
+            // Buscar el contacto si existe
+            let contact = null;
             if (
               conversationObj.participants &&
               conversationObj.participants.contact &&
               typeof conversationObj.participants.contact.reference === "string"
             ) {
+              try {
+                contact = await ContactModel.findOne({
+                  $or: [
+                    {
+                      "properties.key": "mobile",
+                      "properties.value":
+                        conversationObj.participants.contact.reference,
+                    },
+                    {
+                      "properties.key": "phone",
+                      "properties.value":
+                        conversationObj.participants.contact.reference,
+                    },
+                  ],
+                  organizationId: conversationObj.organization,
+                });
+              } catch (error) {
+                console.error("Error buscando contacto:", error);
+              }
+
+              // Agregar información adicional al contacto
               conversationObj.participants.contact.displayInfo = {
                 mobile: conversationObj.participants.contact.reference,
-                name: conversationObj.participants.contact.reference,
+                name:
+                  contact?.properties?.find((p: any) => p.key === "firstName")
+                    ?.value || conversationObj.participants.contact.reference,
+                lastName:
+                  contact?.properties?.find((p: any) => p.key === "lastName")
+                    ?.value || "",
+                email:
+                  contact?.properties?.find((p: any) => p.key === "email")
+                    ?.value || "",
+                position:
+                  contact?.properties?.find((p: any) => p.key === "position")
+                    ?.value || "",
+                contactId: contact?._id || null,
               };
             }
 
@@ -288,9 +355,13 @@ export const getConversationsKanban = async (
           }
         );
 
+        const processedConversationsResolved = await Promise.all(
+          processedConversations
+        );
+
         // Obtener el último mensaje para cada conversación
         const conversationsWithLastMessage = await Promise.all(
-          processedConversations.map(async (conversation) => {
+          processedConversationsResolved.map(async (conversation) => {
             const lastMessage = await Message.findOne({
               $or: [
                 { from: conversation.participants.contact.reference },
@@ -333,7 +404,7 @@ export const getConversationsKanban = async (
         .sort({ lastMessageTimestamp: -1 })
         .limit(limitNumber)
         .populate("lastMessage")
-        .populate("assignedTo", "name email profilePicture");
+        .populate("assignedTo", "firstName lastName email profilePicture");
 
       const total = await Conversation.countDocuments(stageQueryConditions);
       const pages = Math.ceil(total / limitNumber);
@@ -420,13 +491,13 @@ export const getConversationById = async (
     const organizationId = req.user?.organizationId;
     const { page = 1, limit = 500 } = req.query;
 
-    const conversation = await Conversation.findOne({
+    const conversation: any = await Conversation.findOne({
       _id: id,
       organization: organizationId,
     })
       .populate("assignedTo", "name email profilePicture")
       .populate("pipeline")
-      .populate("lastMessage");
+      .lean();
 
     if (!conversation) {
       return res.status(404).json({
@@ -435,90 +506,70 @@ export const getConversationById = async (
       });
     }
 
-    // Buscar si el contacto existe en la base de datos
-    let contact = null;
-    try {
-      if (
-        conversation.participants &&
-        conversation.participants.contact &&
-        conversation.participants.contact.reference
-      ) {
+    // Buscar contacto (único query)
+    let contact: any = null;
+    const reference = conversation?.participants?.contact?.reference;
+    if (reference) {
+      try {
         contact = await ContactModel.findOne({
           $or: [
             {
               "properties.key": "mobile",
-              "properties.value": {
-                $regex: conversation.participants.contact.reference,
-              },
+              "properties.value": { $regex: reference },
             },
             {
               "properties.key": "phone",
-              "properties.value": {
-                $regex: conversation.participants.contact.reference,
-              },
+              "properties.value": { $regex: reference },
             },
             {
               "properties.key": "email",
-              "properties.value": {
-                $regex: conversation.participants.contact.reference,
-              },
+              "properties.value": { $regex: reference },
             },
           ],
-        });
+        })
+          .select("properties")
+          .lean();
+      } catch (error) {
+        console.error("Error obteniendo el contacto:", error);
       }
-    } catch (error) {
-      console.error("Error obteniendo el contacto:", error);
-      // Continuamos con contact = null
     }
 
-    // Procesar conversación
-    const conversationObj: any = conversation.toObject();
+    // Enriquecer conversación con info de contacto
+    if (reference) {
+      const findProp = (key: string) =>
+        contact?.properties?.find((p: any) => p.key === key)?.value;
 
-    // Procesar el participante contacto si tiene un número de teléfono como referencia
-    if (
-      conversationObj.participants &&
-      conversationObj.participants.contact &&
-      typeof conversationObj.participants.contact.reference === "string"
-    ) {
-      // Agregar información adicional al contacto
-      conversationObj.participants.contact.displayInfo = {
-        mobile: conversationObj.participants.contact.reference,
-        name: conversationObj.participants.contact.reference, // Usar el teléfono como nombre por defecto
+      conversation.participants.contact.displayInfo = {
+        mobile: reference,
+        name: findProp("firstName") || reference,
+        lastName: findProp("lastName") || "",
+        email: findProp("email") || "",
+        position: findProp("position") || "",
+        contactId: contact?._id || null,
       };
-
-      conversationObj.participants.contact.contactId = contact?._id || null;
     }
 
-    // Agregar lastMessageTimestamp y mobile
-    conversationObj.lastMessageTimestamp =
-      conversationObj.lastMessage?.timestamp;
-    conversationObj.mobile =
-      conversationObj.participants.contact.reference || "SIN MOVIL";
+    conversation.mobile = reference || "SIN MOVIL";
 
-    // Obtener mensajes de la conversación
+    /* ---------- Mensajes paginados directamente desde Mongo ---------- */
     const pageNumber = parseInt(page as string, 10);
     const limitNumber = parseInt(limit as string, 10);
 
     const totalMessages = await Message.countDocuments({ conversation: id });
 
-    // Obtener todos los mensajes ordenados cronológicamente y luego aplicar paginación
-    const allMessages = await Message.find({ conversation: id })
-      .sort({ timestamp: 1 }) // Orden cronológico (más antiguos primero)
-      .exec();
+    const messagesDesc = await Message.find({ conversation: id })
+      .sort({ timestamp: -1 })
+      .skip((pageNumber - 1) * limitNumber)
+      .limit(limitNumber)
+      .lean();
 
-    // Aplicar paginación manualmente para mantener el orden cronológico
-    const startIndex = Math.max(
-      0,
-      allMessages.length - pageNumber * limitNumber
-    );
-    const endIndex = allMessages.length - (pageNumber - 1) * limitNumber;
-
-    const messages = allMessages.slice(startIndex, endIndex);
+    // Revertimos para mantener orden cronológico ascendente
+    const messages = messagesDesc.reverse();
 
     return res.status(200).json({
       success: true,
       data: {
-        conversation: conversationObj,
+        conversation,
         messages,
         pagination: {
           total: totalMessages,

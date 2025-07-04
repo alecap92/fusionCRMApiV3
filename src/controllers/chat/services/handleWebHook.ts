@@ -39,14 +39,9 @@ export const handleWebhook = async (
 
     // Verificar si es un webhook de status (confirmación de envío)
     if (value.statuses) {
-      // Log más silencioso para webhooks de estado
+      // Solo loguear errores de estado
       if (value.statuses[0].errors) {
-        console.log("Status webhook error:", value.statuses[0].errors);
-      }
-      // Solo loguear estados que no sean 'sent' o 'delivered' para reducir ruido
-      const status = value.statuses[0]?.status;
-      if (status && !["sent", "delivered"].includes(status)) {
-        console.log("Status webhook:", status);
+        console.error("WhatsApp Status Error:", value.statuses[0].errors);
       }
 
       res.status(200).send({
@@ -57,13 +52,7 @@ export const handleWebhook = async (
       return;
     }
 
-    // Si no es un webhook de status, continuar con el procesamiento de mensajes
-    const profileName = value.contacts?.[0]?.profile?.name
-      ? `${value.contacts[0].profile.name} (${value.contacts[0].wa_id})`
-      : "Unknown Contact";
-
-    console.log("Processing message from:", profileName);
-
+    // Procesar mensajes entrantes
     for (const entry of body.entry || []) {
       const { changes } = entry;
 
@@ -71,7 +60,7 @@ export const handleWebhook = async (
         const value = change.value;
 
         if (!value.messages) {
-          continue; // Silenciosamente ignoramos webhooks sin mensajes
+          continue;
         }
 
         const message = value.messages[0];
@@ -86,6 +75,22 @@ export const handleWebhook = async (
           console.error("No display_phone_number in metadata");
           continue;
         }
+
+        // Verificar si el mensaje ya existe para evitar duplicados
+        const existingMessage = await MessageModel.findOne({
+          messageId: message.id,
+        });
+
+        if (existingMessage) {
+          console.log(`[DUPLICATE] Mensaje duplicado ignorado: ${message.id}`);
+          continue;
+        }
+
+        // Log del mensaje entrante
+        const contactName = value.contacts?.[0]?.profile?.name || "Sin nombre";
+        console.log(
+          `[INCOMING] Mensaje de ${contactName} (${from}): ${message.text?.body || type}`
+        );
 
         const integration = await IntegrationsModel.findOne({
           service: "whatsapp",
@@ -175,7 +180,7 @@ export const handleWebhook = async (
         // Crear conversación si no existe
         if (!conversation) {
           conversation = await ConversationModel.create({
-            title: profileName,
+            title: contactName,
             organization: organization,
             participants: {
               user: {
@@ -237,16 +242,6 @@ export const handleWebhook = async (
           ...newMessage.toObject(),
           direction: "incoming",
         });
-        console.log(
-          `[Socket] Mensaje emitido a la sala de conversación: conversation_${conversation._id}`
-        );
-        console.log(`[Socket] Detalles del mensaje:`, {
-          messageId: newMessage._id,
-          from: from,
-          to: to,
-          type: type,
-          timestamp: new Date(parseInt(timestamp) * 1000),
-        });
 
         // Emitir a la sala de la organización
         io.to(`organization_${organization._id}`).emit("whatsapp_message", {
@@ -254,23 +249,20 @@ export const handleWebhook = async (
           contact: from,
           conversationId: conversation._id,
         });
-        console.log(
-          `[Socket] Notificación emitida a la organización: organization_${organization._id}`
-        );
-        console.log(`[Socket] Detalles de la notificación:`, {
-          contact: from,
-          conversationId: conversation._id,
-          organizationId: organization._id,
-        });
 
+        console.log(
+          `[SOCKET] Mensaje enviado a conversación ${conversation._id} y organización ${organization._id}`
+        );
+
+        // Enviar notificación push (si hay tokens configurados)
         const toTokens = ["ExponentPushToken[I5cjWVDWDbnjGPUqFdP2dL]"];
         try {
           await sendNotification(toTokens, {
-            title: value.contacts?.[0]?.profile?.name || "",
+            title: contactName,
             body: text,
           });
         } catch (error) {
-          console.log(error, "Error sending push notification");
+          console.error("[PUSH] Error enviando notificación:", error);
         }
 
         emitNewNotification("whatsapp", organization._id, 1, from, {
@@ -278,13 +270,8 @@ export const handleWebhook = async (
           timestamp: new Date(parseInt(timestamp) * 1000),
         });
 
-        // 🤖 NUEVA LÓGICA DE AUTOMATIZACIONES
+        // Procesar automatizaciones
         try {
-          console.log(
-            `[Automatizaciones] Procesando mensaje para conversación ${conversation._id}`
-          );
-
-          // Importar el ejecutor de automatizaciones
           const { AutomationExecutor } = await import(
             "../../../services/automations/automationExecutor"
           );
@@ -304,19 +291,19 @@ export const handleWebhook = async (
             text,
             isFirstMessage
           );
-        } catch (error) {
-          console.error(
-            `[Automatizaciones] Error procesando automatizaciones:`,
-            error
+
+          console.log(
+            `[AUTOMATION] Procesado mensaje para conversación ${conversation._id}`
           );
-          // No fallar el webhook por errores de automatización
+        } catch (error) {
+          console.error(`[AUTOMATION] Error:`, error);
         }
       }
     }
 
     res.status(200).send("Mensaje recibido");
   } catch (error) {
-    console.error("Error handling webhook:", error);
+    console.error("[WEBHOOK] Error procesando webhook:", error);
     res.status(500).json({ error: "Error handling webhook" });
   }
 };

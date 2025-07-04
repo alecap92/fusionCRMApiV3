@@ -343,7 +343,7 @@ export class AutomationExecutor {
           to: context.contactNumber,
           message,
           accessToken: integration.credentials.accessToken as string,
-          phoneNumberId: integration.credentials.phoneNumberId as string,
+          phoneNumberId: integration.credentials.numberIdIdentifier as string,
         });
 
         if (!messageId) {

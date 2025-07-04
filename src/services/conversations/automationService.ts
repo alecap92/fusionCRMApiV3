@@ -1,18 +1,28 @@
 import ConversationModel from "../../models/ConversationModel";
-import { Schema } from "mongoose";
+import { Types } from "mongoose";
+
+type AutomationUser = "system" | Types.ObjectId | undefined;
 
 interface PauseAutomationParams {
   conversationId: string;
   duration: string; // "30m", "1h", "3h", "6h", "12h", "1d", "forever"
-  userId: string;
+  userId: Types.ObjectId | string;
 }
 
 interface CheckAutomationParams {
   conversationId: string;
-  automationType: string; // "greeting", "follow_up", "reminder", etc.
+  automationType: string;
 }
 
 export class AutomationService {
+  private static convertToAutomationUser(
+    userId: string | Types.ObjectId | undefined
+  ): AutomationUser {
+    if (!userId) return undefined;
+    if (userId === "system") return "system";
+    return typeof userId === "string" ? new Types.ObjectId(userId) : userId;
+  }
+
   /**
    * Pausa las automatizaciones para una conversación
    */
@@ -47,7 +57,7 @@ export class AutomationService {
         ...conversation.automationSettings,
         isPaused: true,
         pausedUntil,
-        pausedBy: userId as any,
+        pausedBy: this.convertToAutomationUser(userId),
         pauseReason: duration,
       };
 
@@ -62,8 +72,15 @@ export class AutomationService {
   /**
    * Reanuda las automatizaciones para una conversación
    */
-  static async resumeAutomations(conversationId: string, userId: string) {
+  static async resumeAutomations(
+    conversationId: string,
+    userId: string | Types.ObjectId
+  ) {
     try {
+      if (!conversationId) {
+        throw new Error("ID de conversación no proporcionado");
+      }
+
       const conversation = await ConversationModel.findById(conversationId);
       if (!conversation) {
         throw new Error("Conversación no encontrada");
@@ -73,7 +90,7 @@ export class AutomationService {
         ...conversation.automationSettings,
         isPaused: false,
         pausedUntil: undefined,
-        pausedBy: userId as any,
+        pausedBy: this.convertToAutomationUser(userId),
         pauseReason: undefined,
       };
 
@@ -169,9 +186,13 @@ export class AutomationService {
   static async recordAutomationTriggered(
     conversationId: string,
     automationType: string,
-    triggeredBy?: string
+    triggeredBy?: string | Types.ObjectId
   ) {
     try {
+      if (!conversationId) {
+        throw new Error("ID de conversación no proporcionado");
+      }
+
       const conversation = await ConversationModel.findById(conversationId);
       if (!conversation) {
         throw new Error("Conversación no encontrada");
@@ -180,7 +201,7 @@ export class AutomationService {
       conversation.automationSettings.automationHistory.push({
         automationType,
         triggeredAt: new Date(),
-        triggeredBy: triggeredBy as any,
+        triggeredBy: this.convertToAutomationUser(triggeredBy),
       });
 
       conversation.automationSettings.lastAutomationTriggered = new Date();
