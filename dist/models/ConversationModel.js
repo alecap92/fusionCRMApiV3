@@ -20,13 +20,35 @@ const metadataSchema = new mongoose_1.Schema({
 });
 const automationHistorySchema = new mongoose_1.Schema({
     automationType: { type: String, required: true },
-    triggeredAt: { type: Date, required: true, default: Date.now },
-    triggeredBy: { type: mongoose_1.Schema.Types.ObjectId, ref: "User" },
+    triggeredAt: { type: Date, required: true },
+    triggeredBy: {
+        type: mongoose_1.Schema.Types.Mixed,
+        ref: "User",
+        validate: {
+            validator: function (v) {
+                return (v === "system" ||
+                    v instanceof mongoose_1.Types.ObjectId ||
+                    typeof v === "undefined");
+            },
+            message: "triggeredBy debe ser 'system' o un ObjectId válido",
+        },
+    },
 });
 const automationSettingsSchema = new mongoose_1.Schema({
     isPaused: { type: Boolean, default: false },
     pausedUntil: { type: Date },
-    pausedBy: { type: mongoose_1.Schema.Types.ObjectId, ref: "User" },
+    pausedBy: {
+        type: mongoose_1.Schema.Types.Mixed,
+        ref: "User",
+        validate: {
+            validator: function (v) {
+                return (v === "system" ||
+                    v instanceof mongoose_1.Types.ObjectId ||
+                    typeof v === "undefined");
+            },
+            message: "pausedBy debe ser 'system' o un ObjectId válido",
+        },
+    },
     pauseReason: {
         type: String,
         enum: ["30m", "1h", "3h", "6h", "12h", "1d", "forever"],

@@ -29,10 +29,7 @@ const enrichChatList = (chatList, organizationId) => __awaiter(void 0, void 0, v
         try {
             const contactInfo = yield ContactModel_1.default.findOne({
                 organizationId,
-                $or: [
-                    { "properties.key": "phone", "properties.value": chat._id },
-                    { "properties.key": "mobile", "properties.value": chat._id },
-                ],
+                $or: [{ "properties.key": "mobile", "properties.value": chat._id }],
             }).lean();
             const name = [
                 (_a = contactInfo === null || contactInfo === void 0 ? void 0 : contactInfo.properties.find((prop) => prop.key === "firstName")) === null || _a === void 0 ? void 0 : _a.value,

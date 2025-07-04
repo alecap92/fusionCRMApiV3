@@ -30,7 +30,7 @@ const contactSchema = new mongoose_1.Schema({
             { value: "", key: "position", isVisible: false },
             { value: "", key: "email", isVisible: false },
             { value: "", key: "phone", isVisible: true },
-            { value: "", key: "cellphone", isVisible: true },
+            { value: "", key: "mobile", isVisible: true },
             { value: "", key: "address", isVisible: false },
             { value: "", key: "city", isVisible: false },
             { value: "", key: "country", isVisible: false },

@@ -16,18 +16,18 @@ exports.findConversationByPhone = void 0;
 const ConversationModel_1 = __importDefault(require("../../models/ConversationModel"));
 const findConversationByPhone = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     var _a, _b;
-    const { phone } = req.query;
+    const { mobile } = req.query;
     const organizationId = (_a = req.user) === null || _a === void 0 ? void 0 : _a.organizationId;
-    if (!phone) {
+    if (!mobile) {
         return res.status(400).json({
             success: false,
-            message: "El parámetro phone es requerido",
+            message: "El parámetro mobile es requerido",
         });
     }
     try {
         // Buscar conversación por número de teléfono
         const conversation = yield ConversationModel_1.default.findOne({
-            "participants.contact.reference": phone,
+            "participants.contact.reference": mobile,
             organization: organizationId,
         })
             .populate("assignedTo", "name email profilePicture")
@@ -45,7 +45,7 @@ const findConversationByPhone = (req, res) => __awaiter(void 0, void 0, void 0, 
             conversationObj.participants.contact &&
             typeof conversationObj.participants.contact.reference === "string") {
             conversationObj.participants.contact.displayInfo = {
-                phone: conversationObj.participants.contact.reference,
+                mobile: conversationObj.participants.contact.reference,
                 name: conversationObj.participants.contact.reference,
             };
         }

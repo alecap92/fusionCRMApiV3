@@ -62,8 +62,13 @@ export const getConversations = async (
       .populate("assignedTo", "name email firstName lastName")
       .lean();
 
+    console.log(
+      `[GET_CONVERSATIONS] Obtenidas ${conversations.length} conversaciones`
+    );
+
     // Si no hay conversaciones, responder inmediatamente
     if (!conversations.length) {
+      console.log("[GET_CONVERSATIONS] No se encontraron conversaciones");
       return res.status(200).json({
         success: true,
         data: [],
@@ -77,6 +82,7 @@ export const getConversations = async (
     }
 
     /* ---------- Contactos en lote ---------- */
+    console.log("[GET_CONVERSATIONS] Buscando información de contactos");
     const references: string[] = [
       ...new Set(
         conversations
@@ -84,6 +90,10 @@ export const getConversations = async (
           .filter(Boolean)
       ),
     ];
+
+    console.log(
+      `[GET_CONVERSATIONS] Referencias de contacto encontradas: ${references.length}`
+    );
 
     const contactsRaw = await ContactModel.find({
       organizationId,
@@ -100,6 +110,10 @@ export const getConversations = async (
     })
       .select("properties")
       .lean();
+
+    console.log(
+      `[GET_CONVERSATIONS] Contactos encontrados: ${contactsRaw.length}`
+    );
 
     const contactsByPhone: Record<string, any> = {};
     for (const contact of contactsRaw) {
@@ -133,9 +147,18 @@ export const getConversations = async (
     }
 
     /* ---------- Construir respuesta ---------- */
+    console.log("[GET_CONVERSATIONS] Procesando conversaciones");
     const processedConversations = conversations.map((conversation: any) => {
       const reference = conversation?.participants?.contact?.reference;
       const contact = reference ? contactsByPhone[reference] : null;
+
+      console.log(`[GET_CONVERSATIONS] Procesando conversación:
+        - ID2: ${conversation._id}
+        - Título: ${conversation.title}
+        - AssignedTo: ${JSON.stringify(conversation.assignedTo)}
+        - Reference: ${reference}
+        - Contact Found: ${!!contact}
+      `);
 
       // Display info de contacto
       if (reference) {
@@ -150,6 +173,12 @@ export const getConversations = async (
           position: findProp("position") || "",
           contactId: contact?._id || null,
         };
+
+        console.log(`[GET_CONVERSATIONS] Display Info generada:
+          - Name: ${conversation.participants.contact.displayInfo.name}
+          - LastName: ${conversation.participants.contact.displayInfo.lastName}
+          - Mobile: ${conversation.participants.contact.displayInfo.mobile}
+        `);
       }
 
       // Añadir mobile helper y último mensaje
@@ -161,6 +190,8 @@ export const getConversations = async (
 
       return conversation;
     });
+
+    console.log("[GET_CONVERSATIONS] Todas las conversaciones procesadas");
 
     const total = await Conversation.countDocuments(queryConditions);
 

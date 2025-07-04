@@ -19,44 +19,28 @@ import { sendCustomMessage } from "./sendCustomMessage";
 export const handleWebhook = async (
   req: Request,
   res: Response
-): Promise<void> => {
+): Promise<Response | void> => {
   try {
-    const body = req.body;
+    console.log("[WEBHOOK] Recibiendo nuevo webhook de WhatsApp");
+    console.log("[WEBHOOK] Body:", JSON.stringify(req.body, null, 2));
 
-    if (body.object !== "whatsapp_business_account") {
-      res.status(400).json({ error: "Invalid webhook payload" });
-      return;
+    const { entry } = req.body;
+
+    if (!entry || !Array.isArray(entry)) {
+      console.log("[WEBHOOK] Webhook inválido: entry no es un array");
+      return res.status(400).json({ error: "Invalid webhook format" });
     }
 
-    // Validar la estructura del webhook
-    if (!body.entry?.[0]?.changes?.[0]?.value) {
-      console.error("Invalid webhook structure:", body);
-      res.status(400).json({ error: "Invalid webhook structure" });
-      return;
-    }
+    for (const value of entry) {
+      console.log("[WEBHOOK] Procesando entrada del webhook");
+      const changes = value.changes;
 
-    const value = body.entry[0].changes[0].value;
-
-    // Verificar si es un webhook de status (confirmación de envío)
-    if (value.statuses) {
-      // Solo loguear errores de estado
-      if (value.statuses[0].errors) {
-        console.error("WhatsApp Status Error:", value.statuses[0].errors);
+      if (!changes || !Array.isArray(changes)) {
+        console.log("[WEBHOOK] Webhook inválido: changes no es un array");
+        continue;
       }
 
-      res.status(200).send({
-        message: "Status webhook received",
-        status: value.statuses[0]?.status,
-        errors: value.statuses[0].errors,
-      });
-      return;
-    }
-
-    // Procesar mensajes entrantes
-    for (const entry of body.entry || []) {
-      const { changes } = entry;
-
-      for (const change of changes || []) {
+      for (const change of changes) {
         const value = change.value;
 
         if (!value.messages) {
@@ -75,22 +59,6 @@ export const handleWebhook = async (
           console.error("No display_phone_number in metadata");
           continue;
         }
-
-        // Verificar si el mensaje ya existe para evitar duplicados
-        const existingMessage = await MessageModel.findOne({
-          messageId: message.id,
-        });
-
-        if (existingMessage) {
-          console.log(`[DUPLICATE] Mensaje duplicado ignorado: ${message.id}`);
-          continue;
-        }
-
-        // Log del mensaje entrante
-        const contactName = value.contacts?.[0]?.profile?.name || "Sin nombre";
-        console.log(
-          `[INCOMING] Mensaje de ${contactName} (${from}): ${message.text?.body || type}`
-        );
 
         const integration = await IntegrationsModel.findOne({
           service: "whatsapp",
@@ -118,6 +86,34 @@ export const handleWebhook = async (
           res.status(500).send("System user not found");
           return;
         }
+
+        // Verificar si el mensaje ya existe
+        const existingMessage = await MessageModel.findOne({
+          messageId: message.id,
+          organization: organization._id,
+        });
+
+        if (existingMessage) {
+          console.log(`[WEBHOOK] Mensaje duplicado detectado:
+            - MessageId: ${message.id}
+            - Organization: ${organization._id}
+            - Timestamp original: ${existingMessage.timestamp}
+          `);
+          continue;
+        }
+
+        console.log(`[WEBHOOK] Creando nuevo mensaje:
+          - From: ${from}
+          - To: ${to}
+          - Type: ${type}
+          - MessageId: ${message.id}
+        `);
+
+        // Log del mensaje entrante
+        const contactName = value.contacts?.[0]?.profile?.name || "Sin nombre";
+        console.log(
+          `[INCOMING] Mensaje de ${contactName} (${from}): ${message.text?.body || type}`
+        );
 
         let text = "";
         let awsUrl: string | null = null;
@@ -179,6 +175,12 @@ export const handleWebhook = async (
 
         // Crear conversación si no existe
         if (!conversation) {
+          console.log(`[WEBHOOK] Creando nueva conversación:
+            - Título: ${contactName}
+            - SystemUserId: ${systemUserId}
+            - Contact Reference: ${from}
+          `);
+
           conversation = await ConversationModel.create({
             title: contactName,
             organization: organization,
@@ -200,12 +202,24 @@ export const handleWebhook = async (
             firstContactTimestamp: new Date(),
             metadata: [],
           });
+
+          console.log(`[WEBHOOK] Conversación creada:
+            - ID: ${conversation._id}
+            - Título: ${conversation.title}
+            - AssignedTo: ${conversation.assignedTo}
+          `);
         } else {
           // Si la conversación existe, verificar si debe reabrirse
+          console.log(`[WEBHOOK] Conversación existente:
+            - ID: ${conversation._id}
+            - Título actual: ${conversation.title}
+            - AssignedTo actual: ${conversation.assignedTo}
+          `);
+
           const wasReopened = await reopenConversationIfClosed(conversation);
           if (wasReopened) {
             console.log(
-              `Conversación ${conversation._id} fue reabierta automáticamente`
+              `[WEBHOOK] Conversación ${conversation._id} fue reabierta automáticamente`
             );
           }
         }
@@ -228,12 +242,18 @@ export const handleWebhook = async (
           conversation: conversation._id,
         });
 
+        console.log(
+          `[WEBHOOK] Mensaje creado exitosamente con ID: ${newMessage._id}`
+        );
+
         // Actualizar la conversación con el último mensaje
+        console.log("[WEBHOOK] Actualizando conversación");
         conversation.lastMessage = newMessage._id as any;
         conversation.lastMessageTimestamp = newMessage.timestamp;
         conversation.unreadCount = (conversation.unreadCount || 0) + 1;
         await conversation.save();
 
+        console.log("[WEBHOOK] Emitiendo eventos de socket");
         // Emitir evento de nuevo mensaje a través de socket
         const io = getSocketInstance();
 

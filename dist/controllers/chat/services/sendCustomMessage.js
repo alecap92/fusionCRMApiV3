@@ -22,27 +22,24 @@ const IntegrationsModel_1 = __importDefault(require("../../../models/Integration
 const ConversationModel_1 = __importDefault(require("../../../models/ConversationModel"));
 const createConversation_1 = require("../../../services/conversations/createConversation");
 const ConversationPipelineModel_1 = __importDefault(require("../../../models/ConversationPipelineModel"));
-const aws_1 = require("../../../config/aws");
 const apiUrl = process.env.WHATSAPP_API_URL;
 const sendCustomMessage = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     var _a;
-    console.log(req.body, "req.body");
-    console.log(req.file, "req.file");
-    const { to, message, messageType, mediaUrl, caption } = req.body;
-    const file = req.file;
-    let fileUrl = null;
-    if (file) {
-        // Guardar el archivo en S3
-        fileUrl = yield (0, aws_1.subirArchivo)(file.buffer, file.originalname, file.mimetype);
-    }
-    if (!to || !messageType || (messageType === "text" && !message)) {
-        console.error("Missing required parameters");
-        return res.status(400).json({ error: "Missing required parameters" });
-    }
     try {
+        console.log("[SEND_CUSTOM] Iniciando envío de mensaje personalizado");
+        const { message, to, type: messageType, mediaUrl, file } = req.body;
+        console.log(`[SEND_CUSTOM] Datos recibidos:
+      - To: ${to}
+      - Type: ${messageType}
+      - MediaUrl: ${mediaUrl || "N/A"}
+    `);
+        if (!to || !messageType || (messageType === "text" && !message)) {
+            console.error("[SEND_CUSTOM] Faltan parámetros requeridos");
+            return res.status(400).json({ error: "Missing required parameters" });
+        }
         if (!req.user) {
-            console.error("User not found");
-            return res.status(400).json({ error: "User not found" });
+            console.error("[SEND_CUSTOM] Usuario no encontrado");
+            return res.status(401).json({ error: "User not found" });
         }
         const user = yield UserModel_1.default.findById(req.user._id);
         if (!user) {
@@ -82,7 +79,7 @@ const sendCustomMessage = (req, res) => __awaiter(void 0, void 0, void 0, functi
                 };
                 break;
             case "image":
-                if (!fileUrl) {
+                if (!mediaUrl) {
                     return res
                         .status(400)
                         .json({ error: "mediaUrl is required for image messages" });
@@ -92,14 +89,14 @@ const sendCustomMessage = (req, res) => __awaiter(void 0, void 0, void 0, functi
                     to,
                     type: "image",
                     image: {
-                        link: fileUrl,
-                        caption: caption || "", // Caption es opcional
+                        link: mediaUrl,
+                        caption: "", // Caption es opcional
                     },
                     message: "imagen",
                 };
                 break;
             case "document":
-                if (!fileUrl && !mediaUrl) {
+                if (!mediaUrl && !file) {
                     return res.status(400).json({
                         error: "Se requiere un archivo o mediaUrl para mensajes de tipo document",
                     });
@@ -127,14 +124,14 @@ const sendCustomMessage = (req, res) => __awaiter(void 0, void 0, void 0, functi
                     to,
                     type: "document",
                     document: {
-                        link: fileUrl || mediaUrl, // Usar fileUrl si existe, sino mediaUrl
-                        caption: caption || "",
+                        link: mediaUrl || "", // Usar mediaUrl si existe, sino ""
+                        caption: "",
                     },
                     message: "documento",
                 };
                 break;
             case "video":
-                if (!fileUrl) {
+                if (!mediaUrl) {
                     return res
                         .status(400)
                         .json({ error: "mediaUrl is required for video messages" });
@@ -144,14 +141,14 @@ const sendCustomMessage = (req, res) => __awaiter(void 0, void 0, void 0, functi
                     to,
                     type: "video",
                     video: {
-                        link: fileUrl,
-                        caption: caption || "", // Caption es opcional
+                        link: mediaUrl,
+                        caption: "", // Caption es opcional
                     },
                     message: "video",
                 };
                 break;
             case "audio":
-                if (!fileUrl) {
+                if (!mediaUrl) {
                     return res
                         .status(400)
                         .json({ error: "mediaUrl is required for audio messages" });
@@ -161,7 +158,7 @@ const sendCustomMessage = (req, res) => __awaiter(void 0, void 0, void 0, functi
                     to,
                     type: "audio",
                     audio: {
-                        link: fileUrl,
+                        link: mediaUrl,
                     },
                     message: "audio",
                 };
@@ -244,39 +241,49 @@ const sendCustomMessage = (req, res) => __awaiter(void 0, void 0, void 0, functi
             conversation = newConversation;
         }
         if (response.status === 200 || response.status === 201) {
+            console.log("[SEND_CUSTOM] Mensaje enviado exitosamente a WhatsApp API");
+            // Verificar si ya existe un mensaje con este ID
+            if (messageId) {
+                const existingMessage = yield MessageModel_1.default.findOne({
+                    messageId,
+                    organization: organization._id,
+                });
+                if (existingMessage) {
+                    console.log(`[SEND_CUSTOM] Mensaje duplicado detectado, messageId: ${messageId}`);
+                    return res.status(409).json({ error: "Mensaje duplicado" });
+                }
+            }
+            console.log("[SEND_CUSTOM] Guardando mensaje en la base de datos");
             // Crear y almacenar el mensaje usando el nuevo MessageModel
             const outgoingMessage = yield MessageModel_1.default.create({
                 user: user._id,
                 organization: organization._id,
                 from: integration.credentials.phoneNumber || "",
                 to,
-                message: messageType === "text" ? message : fileUrl,
+                message: messageType === "text" ? message : mediaUrl,
                 direction: "outgoing",
                 type: messageType,
-                mediaUrl: fileUrl || "",
+                mediaUrl: mediaUrl || "",
                 timestamp: new Date().toISOString(),
                 messageId: messageId,
                 conversation: conversation === null || conversation === void 0 ? void 0 : conversation._id,
             });
+            console.log(`[SEND_CUSTOM] Mensaje guardado exitosamente con ID: ${outgoingMessage._id}`);
+            console.log("[SEND_CUSTOM] Emitiendo evento de socket");
             const io = (0, socket_1.getSocketInstance)();
             io.emit("newMessage", Object.assign(Object.assign({}, outgoingMessage.toObject()), { direction: "outgoing" }));
             return res.status(200).json(outgoingMessage);
         }
         else {
-            console.error("Error response from WhatsApp API:", response.data);
+            console.error("[SEND_CUSTOM] Error en respuesta de WhatsApp API:", response.data);
             return res
                 .status(500)
                 .json({ error: "Error sending message", details: response.data });
         }
     }
     catch (error) {
-        console.log(error.message);
-        console.error("Error en el procesamiento del mensaje:", error);
-        return res.status(500).json({
-            error: "Error en el procesamiento del mensaje",
-            message: error.message,
-            stack: process.env.NODE_ENV === "development" ? error.stack : undefined,
-        });
+        console.error("[SEND_CUSTOM] Error:", error);
+        return res.status(500).json({ error: "Internal server error" });
     }
 });
 exports.sendCustomMessage = sendCustomMessage;

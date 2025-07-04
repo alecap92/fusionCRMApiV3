@@ -88,7 +88,7 @@ const importContacts = (req, res) => __awaiter(void 0, void 0, void 0, function*
                 if (prop.key === "email") {
                     email = prop.value;
                 }
-                else if (prop.key === "mobile" || prop.key === "cellphone") {
+                else if (prop.key === "mobile") {
                     mobile = prop.value;
                 }
             }
@@ -107,10 +107,8 @@ const importContacts = (req, res) => __awaiter(void 0, void 0, void 0, function*
                 mobile.trim() !== "") {
                 existingContact = yield ContactModel_1.default.findOne({
                     organizationId,
-                    $or: [
-                        { "properties.key": "mobile", "properties.value": mobile },
-                        { "properties.key": "cellphone", "properties.value": mobile },
-                    ],
+                    "properties.key": "mobile",
+                    "properties.value": mobile,
                 });
             }
             if (existingContact) {

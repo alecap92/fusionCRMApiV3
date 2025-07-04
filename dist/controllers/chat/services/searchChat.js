@@ -53,10 +53,7 @@ const searchChats = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
         const results = yield Promise.all(messagesMatches.map((match) => __awaiter(void 0, void 0, void 0, function* () {
             const contactInfo = yield ContactModel_1.default.findOne({
                 organizationId,
-                $or: [
-                    { "properties.key": "phone", "properties.value": match._id },
-                    { "properties.key": "cellphone", "properties.value": match._id },
-                ],
+                $or: [{ "properties.key": "mobile", "properties.value": match._id }],
             })
                 .lean()
                 .exec();

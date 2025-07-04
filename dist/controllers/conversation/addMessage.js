@@ -22,8 +22,17 @@ const createConversation_1 = require("../../services/conversations/createConvers
 const addMessage = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     var _a;
     try {
+        console.log("[ADD_MESSAGE] Iniciando guardado de mensaje manual");
         const { conversationId } = req.params;
         const { from, to, message, mediaUrl, mediaId, type, direction, latitude, longitude, replyToMessage, messageId, } = req.body;
+        console.log(`[ADD_MESSAGE] Datos recibidos: 
+      - From: ${from}
+      - To: ${to}
+      - Type: ${type}
+      - Direction: ${direction}
+      - MessageId: ${messageId}
+      - ConversationId: ${conversationId}
+    `);
         const organizationId = req.organization;
         const userId = (_a = req.user) === null || _a === void 0 ? void 0 : _a._id;
         // Validaciones básicas
@@ -48,7 +57,22 @@ const addMessage = (req, res) => __awaiter(void 0, void 0, void 0, function* () 
         if (direction === "incoming") {
             yield (0, createConversation_1.reopenConversationIfClosed)(conversation);
         }
+        // Verificar si ya existe un mensaje con el mismo messageId
+        if (messageId) {
+            const existingMessage = yield MessageModel_1.default.findOne({
+                messageId,
+                organization: organizationId,
+            });
+            if (existingMessage) {
+                console.log(`[ADD_MESSAGE] Mensaje duplicado detectado, messageId: ${messageId}`);
+                return res.status(409).json({
+                    success: false,
+                    message: "Mensaje duplicado",
+                });
+            }
+        }
         // Crear el nuevo mensaje
+        console.log("[ADD_MESSAGE] Creando nuevo mensaje en la base de datos");
         const newMessage = new MessageModel_1.default({
             user: userId,
             organization: organizationId,
@@ -68,7 +92,9 @@ const addMessage = (req, res) => __awaiter(void 0, void 0, void 0, function* () 
             conversation: conversationId,
         });
         yield newMessage.save();
+        console.log(`[ADD_MESSAGE] Mensaje guardado exitosamente con ID: ${newMessage._id}`);
         // Actualizar la conversación con la referencia al último mensaje
+        console.log("[ADD_MESSAGE] Actualizando conversación con el nuevo mensaje");
         conversation.lastMessage = newMessage._id;
         conversation.lastMessageTimestamp = newMessage.timestamp;
         // Si es un mensaje entrante, incrementar el contador de no leídos

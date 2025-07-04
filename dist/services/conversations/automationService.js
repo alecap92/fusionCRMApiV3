@@ -14,7 +14,15 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.AutomationService = void 0;
 const ConversationModel_1 = __importDefault(require("../../models/ConversationModel"));
+const mongoose_1 = require("mongoose");
 class AutomationService {
+    static convertToAutomationUser(userId) {
+        if (!userId)
+            return undefined;
+        if (userId === "system")
+            return "system";
+        return typeof userId === "string" ? new mongoose_1.Types.ObjectId(userId) : userId;
+    }
     /**
      * Pausa las automatizaciones para una conversación
      */
@@ -38,7 +46,7 @@ class AutomationService {
                     };
                     pausedUntil = new Date(now.getTime() + durationMap[duration]);
                 }
-                conversation.automationSettings = Object.assign(Object.assign({}, conversation.automationSettings), { isPaused: true, pausedUntil, pausedBy: userId, pauseReason: duration });
+                conversation.automationSettings = Object.assign(Object.assign({}, conversation.automationSettings), { isPaused: true, pausedUntil, pausedBy: this.convertToAutomationUser(userId), pauseReason: duration });
                 yield conversation.save();
                 return conversation;
             }
@@ -54,11 +62,14 @@ class AutomationService {
     static resumeAutomations(conversationId, userId) {
         return __awaiter(this, void 0, void 0, function* () {
             try {
+                if (!conversationId) {
+                    throw new Error("ID de conversación no proporcionado");
+                }
                 const conversation = yield ConversationModel_1.default.findById(conversationId);
                 if (!conversation) {
                     throw new Error("Conversación no encontrada");
                 }
-                conversation.automationSettings = Object.assign(Object.assign({}, conversation.automationSettings), { isPaused: false, pausedUntil: undefined, pausedBy: userId, pauseReason: undefined });
+                conversation.automationSettings = Object.assign(Object.assign({}, conversation.automationSettings), { isPaused: false, pausedUntil: undefined, pausedBy: this.convertToAutomationUser(userId), pauseReason: undefined });
                 yield conversation.save();
                 return conversation;
             }
@@ -138,6 +149,9 @@ class AutomationService {
     static recordAutomationTriggered(conversationId, automationType, triggeredBy) {
         return __awaiter(this, void 0, void 0, function* () {
             try {
+                if (!conversationId) {
+                    throw new Error("ID de conversación no proporcionado");
+                }
                 const conversation = yield ConversationModel_1.default.findById(conversationId);
                 if (!conversation) {
                     throw new Error("Conversación no encontrada");
@@ -145,7 +159,7 @@ class AutomationService {
                 conversation.automationSettings.automationHistory.push({
                     automationType,
                     triggeredAt: new Date(),
-                    triggeredBy: triggeredBy,
+                    triggeredBy: this.convertToAutomationUser(triggeredBy),
                 });
                 conversation.automationSettings.lastAutomationTriggered = new Date();
                 yield conversation.save();

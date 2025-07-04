@@ -66,4 +66,10 @@ const messageSchema = new Schema<IMessage>({
   },
 });
 
+// Agregar índice único compuesto para evitar duplicados
+messageSchema.index(
+  { messageId: 1, organization: 1 },
+  { unique: true, sparse: true }
+);
+
 export default model<IMessage>("Message", messageSchema);

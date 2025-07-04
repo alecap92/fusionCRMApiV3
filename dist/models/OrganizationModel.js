@@ -99,7 +99,7 @@ const organizationSchema = new mongoose_1.Schema({
             { label: "Posición", key: "position", isVisible: false },
             { label: "Email", key: "email", isVisible: true },
             { label: "Teléfono", key: "phone", isVisible: false },
-            { label: "Teléfono Celular", key: "cellphone", isVisible: false },
+            { label: "Teléfono Móvil", key: "mobile", isVisible: false },
             { label: "Dirección", key: "address", isVisible: false },
             { label: "Ciudad", key: "city", isVisible: false },
             { label: "País", key: "country", isVisible: false },

@@ -58,56 +58,33 @@ const ConversationPipelineModel_1 = __importDefault(require("../../../models/Con
 const socket_1 = require("../../../config/socket");
 const createConversation_1 = require("../../../services/conversations/createConversation");
 const handleWebhook = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l, _m, _o, _p, _q, _r, _s, _t;
+    var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k;
     try {
-        const body = req.body;
-        if (body.object !== "whatsapp_business_account") {
-            res.status(400).json({ error: "Invalid webhook payload" });
-            return;
+        console.log("[WEBHOOK] Recibiendo nuevo webhook de WhatsApp");
+        console.log("[WEBHOOK] Body:", JSON.stringify(req.body, null, 2));
+        const { entry } = req.body;
+        if (!entry || !Array.isArray(entry)) {
+            console.log("[WEBHOOK] Webhook inválido: entry no es un array");
+            return res.status(400).json({ error: "Invalid webhook format" });
         }
-        // Validar la estructura del webhook
-        if (!((_d = (_c = (_b = (_a = body.entry) === null || _a === void 0 ? void 0 : _a[0]) === null || _b === void 0 ? void 0 : _b.changes) === null || _c === void 0 ? void 0 : _c[0]) === null || _d === void 0 ? void 0 : _d.value)) {
-            console.error("Invalid webhook structure:", body);
-            res.status(400).json({ error: "Invalid webhook structure" });
-            return;
-        }
-        const value = body.entry[0].changes[0].value;
-        // Verificar si es un webhook de status (confirmación de envío)
-        if (value.statuses) {
-            // Log más silencioso para webhooks de estado
-            if (value.statuses[0].errors) {
-                console.log("Status webhook error:", value.statuses[0].errors);
+        for (const value of entry) {
+            console.log("[WEBHOOK] Procesando entrada del webhook");
+            const changes = value.changes;
+            if (!changes || !Array.isArray(changes)) {
+                console.log("[WEBHOOK] Webhook inválido: changes no es un array");
+                continue;
             }
-            // Solo loguear estados que no sean 'sent' o 'delivered' para reducir ruido
-            const status = (_e = value.statuses[0]) === null || _e === void 0 ? void 0 : _e.status;
-            if (status && !["sent", "delivered"].includes(status)) {
-                console.log("Status webhook:", status);
-            }
-            res.status(200).send({
-                message: "Status webhook received",
-                status: (_f = value.statuses[0]) === null || _f === void 0 ? void 0 : _f.status,
-                errors: value.statuses[0].errors,
-            });
-            return;
-        }
-        // Si no es un webhook de status, continuar con el procesamiento de mensajes
-        const profileName = ((_j = (_h = (_g = value.contacts) === null || _g === void 0 ? void 0 : _g[0]) === null || _h === void 0 ? void 0 : _h.profile) === null || _j === void 0 ? void 0 : _j.name)
-            ? `${value.contacts[0].profile.name} (${value.contacts[0].wa_id})`
-            : "Unknown Contact";
-        console.log("Processing message from:", profileName);
-        for (const entry of body.entry || []) {
-            const { changes } = entry;
-            for (const change of changes || []) {
+            for (const change of changes) {
                 const value = change.value;
                 if (!value.messages) {
-                    continue; // Silenciosamente ignoramos webhooks sin mensajes
+                    continue;
                 }
                 const message = value.messages[0];
                 if (!message) {
                     continue;
                 }
                 const { from, timestamp, type } = message;
-                const to = (_k = value.metadata) === null || _k === void 0 ? void 0 : _k.display_phone_number;
+                const to = (_a = value.metadata) === null || _a === void 0 ? void 0 : _a.display_phone_number;
                 if (!to) {
                     console.error("No display_phone_number in metadata");
                     continue;
@@ -132,6 +109,28 @@ const handleWebhook = (req, res) => __awaiter(void 0, void 0, void 0, function* 
                     res.status(500).send("System user not found");
                     return;
                 }
+                // Verificar si el mensaje ya existe
+                const existingMessage = yield MessageModel_1.default.findOne({
+                    messageId: message.id,
+                    organization: organization._id,
+                });
+                if (existingMessage) {
+                    console.log(`[WEBHOOK] Mensaje duplicado detectado:
+            - MessageId: ${message.id}
+            - Organization: ${organization._id}
+            - Timestamp original: ${existingMessage.timestamp}
+          `);
+                    continue;
+                }
+                console.log(`[WEBHOOK] Creando nuevo mensaje:
+          - From: ${from}
+          - To: ${to}
+          - Type: ${type}
+          - MessageId: ${message.id}
+        `);
+                // Log del mensaje entrante
+                const contactName = ((_d = (_c = (_b = value.contacts) === null || _b === void 0 ? void 0 : _b[0]) === null || _c === void 0 ? void 0 : _c.profile) === null || _d === void 0 ? void 0 : _d.name) || "Sin nombre";
+                console.log(`[INCOMING] Mensaje de ${contactName} (${from}): ${((_e = message.text) === null || _e === void 0 ? void 0 : _e.body) || type}`);
                 let text = "";
                 let awsUrl = null;
                 if (type === "reaction") {
@@ -152,7 +151,7 @@ const handleWebhook = (req, res) => __awaiter(void 0, void 0, void 0, function* 
                 else {
                     text = "Otro tipo de mensaje recibido";
                 }
-                const repliedMessageId = (_l = message.context) === null || _l === void 0 ? void 0 : _l.id;
+                const repliedMessageId = (_f = message.context) === null || _f === void 0 ? void 0 : _f.id;
                 const originalMessage = repliedMessageId
                     ? yield MessageModel_1.default.findOne({ messageId: repliedMessageId })
                     : null;
@@ -178,8 +177,13 @@ const handleWebhook = (req, res) => __awaiter(void 0, void 0, void 0, function* 
                 */
                 // Crear conversación si no existe
                 if (!conversation) {
+                    console.log(`[WEBHOOK] Creando nueva conversación:
+            - Título: ${contactName}
+            - SystemUserId: ${systemUserId}
+            - Contact Reference: ${from}
+          `);
                     conversation = yield ConversationModel_1.default.create({
-                        title: profileName,
+                        title: contactName,
                         organization: organization,
                         participants: {
                             user: {
@@ -199,12 +203,22 @@ const handleWebhook = (req, res) => __awaiter(void 0, void 0, void 0, function* 
                         firstContactTimestamp: new Date(),
                         metadata: [],
                     });
+                    console.log(`[WEBHOOK] Conversación creada:
+            - ID: ${conversation._id}
+            - Título: ${conversation.title}
+            - AssignedTo: ${conversation.assignedTo}
+          `);
                 }
                 else {
                     // Si la conversación existe, verificar si debe reabrirse
+                    console.log(`[WEBHOOK] Conversación existente:
+            - ID: ${conversation._id}
+            - Título actual: ${conversation.title}
+            - AssignedTo actual: ${conversation.assignedTo}
+          `);
                     const wasReopened = yield (0, createConversation_1.reopenConversationIfClosed)(conversation);
                     if (wasReopened) {
-                        console.log(`Conversación ${conversation._id} fue reabierta automáticamente`);
+                        console.log(`[WEBHOOK] Conversación ${conversation._id} fue reabierta automáticamente`);
                     }
                 }
                 // Crear mensaje
@@ -215,62 +229,51 @@ const handleWebhook = (req, res) => __awaiter(void 0, void 0, void 0, function* 
                     to,
                     message: text,
                     mediaUrl: awsUrl,
-                    mediaId: ((_m = message[type]) === null || _m === void 0 ? void 0 : _m.id) || "",
+                    mediaId: ((_g = message[type]) === null || _g === void 0 ? void 0 : _g.id) || "",
                     timestamp: new Date(parseInt(timestamp) * 1000),
                     type,
                     direction: "incoming",
-                    possibleName: ((_q = (_p = (_o = value.contacts) === null || _o === void 0 ? void 0 : _o[0]) === null || _p === void 0 ? void 0 : _p.profile) === null || _q === void 0 ? void 0 : _q.name) || "",
+                    possibleName: ((_k = (_j = (_h = value.contacts) === null || _h === void 0 ? void 0 : _h[0]) === null || _j === void 0 ? void 0 : _j.profile) === null || _k === void 0 ? void 0 : _k.name) || "",
                     replyToMessage: (originalMessage === null || originalMessage === void 0 ? void 0 : originalMessage._id) || null,
                     messageId: message.id,
                     conversation: conversation._id,
                 });
+                console.log(`[WEBHOOK] Mensaje creado exitosamente con ID: ${newMessage._id}`);
                 // Actualizar la conversación con el último mensaje
+                console.log("[WEBHOOK] Actualizando conversación");
                 conversation.lastMessage = newMessage._id;
                 conversation.lastMessageTimestamp = newMessage.timestamp;
                 conversation.unreadCount = (conversation.unreadCount || 0) + 1;
                 yield conversation.save();
+                console.log("[WEBHOOK] Emitiendo eventos de socket");
                 // Emitir evento de nuevo mensaje a través de socket
                 const io = (0, socket_1.getSocketInstance)();
                 // Emitir a la sala de la conversación
                 io.to(`conversation_${conversation._id}`).emit("newMessage", Object.assign(Object.assign({}, newMessage.toObject()), { direction: "incoming" }));
-                console.log(`[Socket] Mensaje emitido a la sala de conversación: conversation_${conversation._id}`);
-                console.log(`[Socket] Detalles del mensaje:`, {
-                    messageId: newMessage._id,
-                    from: from,
-                    to: to,
-                    type: type,
-                    timestamp: new Date(parseInt(timestamp) * 1000),
-                });
                 // Emitir a la sala de la organización
                 io.to(`organization_${organization._id}`).emit("whatsapp_message", {
                     message: newMessage.toObject(),
                     contact: from,
                     conversationId: conversation._id,
                 });
-                console.log(`[Socket] Notificación emitida a la organización: organization_${organization._id}`);
-                console.log(`[Socket] Detalles de la notificación:`, {
-                    contact: from,
-                    conversationId: conversation._id,
-                    organizationId: organization._id,
-                });
+                console.log(`[SOCKET] Mensaje enviado a conversación ${conversation._id} y organización ${organization._id}`);
+                // Enviar notificación push (si hay tokens configurados)
                 const toTokens = ["ExponentPushToken[I5cjWVDWDbnjGPUqFdP2dL]"];
                 try {
                     yield (0, pushNotificationService_1.sendNotification)(toTokens, {
-                        title: ((_t = (_s = (_r = value.contacts) === null || _r === void 0 ? void 0 : _r[0]) === null || _s === void 0 ? void 0 : _s.profile) === null || _t === void 0 ? void 0 : _t.name) || "",
+                        title: contactName,
                         body: text,
                     });
                 }
                 catch (error) {
-                    console.log(error, "Error sending push notification");
+                    console.error("[PUSH] Error enviando notificación:", error);
                 }
                 (0, notificationController_1.emitNewNotification)("whatsapp", organization._id, 1, from, {
                     message: text,
                     timestamp: new Date(parseInt(timestamp) * 1000),
                 });
-                // 🤖 NUEVA LÓGICA DE AUTOMATIZACIONES
+                // Procesar automatizaciones
                 try {
-                    console.log(`[Automatizaciones] Procesando mensaje para conversación ${conversation._id}`);
-                    // Importar el ejecutor de automatizaciones
                     const { AutomationExecutor } = yield Promise.resolve().then(() => __importStar(require("../../../services/automations/automationExecutor")));
                     // Determinar si es el primer mensaje de la conversación
                     const messageCount = yield MessageModel_1.default.countDocuments({
@@ -280,17 +283,17 @@ const handleWebhook = (req, res) => __awaiter(void 0, void 0, void 0, function* 
                     const isFirstMessage = messageCount === 1;
                     // Procesar el mensaje con el sistema de automatizaciones
                     yield AutomationExecutor.processIncomingMessage(conversation._id.toString(), organization._id.toString(), from, text, isFirstMessage);
+                    console.log(`[AUTOMATION] Procesado mensaje para conversación ${conversation._id}`);
                 }
                 catch (error) {
-                    console.error(`[Automatizaciones] Error procesando automatizaciones:`, error);
-                    // No fallar el webhook por errores de automatización
+                    console.error(`[AUTOMATION] Error:`, error);
                 }
             }
         }
         res.status(200).send("Mensaje recibido");
     }
     catch (error) {
-        console.error("Error handling webhook:", error);
+        console.error("[WEBHOOK] Error procesando webhook:", error);
         res.status(500).json({ error: "Error handling webhook" });
     }
 });

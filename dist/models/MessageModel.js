@@ -38,4 +38,6 @@ const messageSchema = new mongoose_1.Schema({
         required: true,
     },
 });
+// Agregar índice único compuesto para evitar duplicados
+messageSchema.index({ messageId: 1, organization: 1 }, { unique: true, sparse: true });
 exports.default = (0, mongoose_1.model)("Message", messageSchema);

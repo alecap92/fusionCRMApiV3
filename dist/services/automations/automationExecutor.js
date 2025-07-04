@@ -287,7 +287,7 @@ class AutomationExecutor {
                         to: context.contactNumber,
                         message,
                         accessToken: integration.credentials.accessToken,
-                        phoneNumberId: integration.credentials.phoneNumberId,
+                        phoneNumberId: integration.credentials.numberIdIdentifier,
                     });
                     if (!messageId) {
                         console.error("Error al enviar mensaje de WhatsApp");
