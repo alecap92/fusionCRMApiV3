@@ -120,6 +120,19 @@ export const addMessage = async (
       conversation.unreadCount = (conversation.unreadCount || 0) + 1;
     }
 
+    // Si falta displayInfo del contacto, intentar enriquecerlo mínimamente (solo mobile)
+    try {
+      const ref = conversation?.participants?.contact?.reference;
+      if (ref && !conversation?.participants?.contact?.displayInfo?.mobile) {
+        (conversation as any).participants.contact.displayInfo = {
+          ...(conversation as any).participants.contact.displayInfo,
+          mobile: ref,
+        };
+      }
+    } catch (e) {
+      console.warn("[ADD_MESSAGE] No se pudo enriquecer displayInfo:", e);
+    }
+
     await conversation.save();
 
     return res.status(201).json({

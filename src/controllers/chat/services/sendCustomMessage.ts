@@ -312,6 +312,23 @@ export const sendCustomMessage = async (
         direction: "outgoing",
       });
 
+      // Actualizar la conversación con el último mensaje saliente
+      try {
+        await ConversationModel.findByIdAndUpdate(
+          conversation._id,
+          {
+            lastMessage: outgoingMessage._id,
+            lastMessageTimestamp: outgoingMessage.timestamp,
+          },
+          { new: true }
+        );
+      } catch (updateErr) {
+        console.error(
+          "[SEND_CUSTOM] Error actualizando lastMessage en conversación:",
+          updateErr
+        );
+      }
+
       return res.status(200).json(outgoingMessage);
     } else {
       console.error(

@@ -264,65 +264,74 @@ const getConversationsKanban = (req, res) => __awaiter(void 0, void 0, void 0, f
                     .populate("assignedTo", "firstName lastName email profilePicture");
                 const total = yield ConversationModel_1.default.countDocuments(stageQueryConditions);
                 const pages = Math.ceil(total / limitNumber);
-                // Procesar las conversaciones
-                const processedConversations = conversations.map((conversation) => __awaiter(void 0, void 0, void 0, function* () {
-                    var _a, _b, _c, _d, _e, _f, _g, _h, _j;
-                    const conversationObj = conversation.toObject();
-                    // Buscar el contacto si existe
-                    let contact = null;
-                    if (conversationObj.participants &&
-                        conversationObj.participants.contact &&
-                        typeof conversationObj.participants.contact.reference === "string") {
-                        try {
-                            contact = yield ContactModel_1.default.findOne({
-                                $or: [
-                                    {
-                                        "properties.key": "mobile",
-                                        "properties.value": conversationObj.participants.contact.reference,
-                                    },
-                                    {
-                                        "properties.key": "phone",
-                                        "properties.value": conversationObj.participants.contact.reference,
-                                    },
-                                ],
-                                organizationId: conversationObj.organization,
-                            });
+                // Conversaciones en objetos plain
+                const conversationObjs = conversations.map((c) => c.toObject());
+                // Batch de contactos por referencia
+                const references = [
+                    ...new Set(conversationObjs
+                        .map((o) => { var _a, _b; return (_b = (_a = o === null || o === void 0 ? void 0 : o.participants) === null || _a === void 0 ? void 0 : _a.contact) === null || _b === void 0 ? void 0 : _b.reference; })
+                        .filter(Boolean)),
+                ];
+                let contactsByPhone = {};
+                if (references.length) {
+                    try {
+                        const contactsRaw = yield ContactModel_1.default.find({
+                            organizationId,
+                            $or: [
+                                {
+                                    "properties.key": "mobile",
+                                    "properties.value": { $in: references },
+                                },
+                                {
+                                    "properties.key": "phone",
+                                    "properties.value": { $in: references },
+                                },
+                            ],
+                        })
+                            .select("properties")
+                            .lean();
+                        for (const contact of contactsRaw) {
+                            if (!(contact === null || contact === void 0 ? void 0 : contact.properties))
+                                continue;
+                            for (const prop of contact.properties) {
+                                if ((prop.key === "mobile" || prop.key === "phone") &&
+                                    references.includes(prop.value)) {
+                                    contactsByPhone[prop.value] = contact;
+                                }
+                            }
                         }
-                        catch (error) {
-                            console.error("Error buscando contacto:", error);
-                        }
-                        // Agregar información adicional al contacto
+                    }
+                    catch (error) {
+                        console.error("[KANBAN] Error buscando contactos en lote:", error);
+                    }
+                }
+                // Enriquecer conversaciones con displayInfo y timestamps
+                const processedConversationsResolved = conversationObjs.map((conversationObj) => {
+                    var _a, _b, _c;
+                    const ref = (_b = (_a = conversationObj === null || conversationObj === void 0 ? void 0 : conversationObj.participants) === null || _a === void 0 ? void 0 : _a.contact) === null || _b === void 0 ? void 0 : _b.reference;
+                    if (ref) {
+                        const contact = contactsByPhone[ref];
+                        const findProp = (key) => { var _a, _b; return (_b = (_a = contact === null || contact === void 0 ? void 0 : contact.properties) === null || _a === void 0 ? void 0 : _a.find((p) => p.key === key)) === null || _b === void 0 ? void 0 : _b.value; };
                         conversationObj.participants.contact.displayInfo = {
-                            mobile: conversationObj.participants.contact.reference,
-                            name: ((_b = (_a = contact === null || contact === void 0 ? void 0 : contact.properties) === null || _a === void 0 ? void 0 : _a.find((p) => p.key === "firstName")) === null || _b === void 0 ? void 0 : _b.value) || conversationObj.participants.contact.reference,
-                            lastName: ((_d = (_c = contact === null || contact === void 0 ? void 0 : contact.properties) === null || _c === void 0 ? void 0 : _c.find((p) => p.key === "lastName")) === null || _d === void 0 ? void 0 : _d.value) || "",
-                            email: ((_f = (_e = contact === null || contact === void 0 ? void 0 : contact.properties) === null || _e === void 0 ? void 0 : _e.find((p) => p.key === "email")) === null || _f === void 0 ? void 0 : _f.value) || "",
-                            position: ((_h = (_g = contact === null || contact === void 0 ? void 0 : contact.properties) === null || _g === void 0 ? void 0 : _g.find((p) => p.key === "position")) === null || _h === void 0 ? void 0 : _h.value) || "",
+                            mobile: ref,
+                            name: findProp("firstName") || ref,
+                            lastName: findProp("lastName") || "",
+                            email: findProp("email") || "",
+                            position: findProp("position") || "",
                             contactId: (contact === null || contact === void 0 ? void 0 : contact._id) || null,
                         };
                     }
                     conversationObj.lastMessageTimestamp =
-                        (_j = conversationObj.lastMessage) === null || _j === void 0 ? void 0 : _j.timestamp;
-                    conversationObj.mobile =
-                        conversationObj.participants.contact.reference;
+                        (_c = conversationObj.lastMessage) === null || _c === void 0 ? void 0 : _c.timestamp;
+                    conversationObj.mobile = ref;
                     return conversationObj;
-                }));
-                const processedConversationsResolved = yield Promise.all(processedConversations);
-                // Obtener el último mensaje para cada conversación
-                const conversationsWithLastMessage = yield Promise.all(processedConversationsResolved.map((conversation) => __awaiter(void 0, void 0, void 0, function* () {
-                    const lastMessage = yield MessageModel_1.default.findOne({
-                        $or: [
-                            { from: conversation.participants.contact.reference },
-                            { to: conversation.participants.contact.reference },
-                        ],
-                    }).sort({ timestamp: -1 });
-                    return Object.assign(Object.assign({}, conversation), { lastMessage: lastMessage || null });
-                })));
+                });
                 return res.status(200).json({
                     success: true,
                     data: {
                         stageId,
-                        conversations: conversationsWithLastMessage,
+                        // lastMessage ya viene poblado por .populate("lastMessage")
+                        conversations: processedConversationsResolved,
                         pagination: {
                             page: pageNumber,
                             limit: limitNumber,
@@ -344,34 +353,61 @@ const getConversationsKanban = (req, res) => __awaiter(void 0, void 0, void 0, f
                 .populate("assignedTo", "firstName lastName email profilePicture");
             const total = yield ConversationModel_1.default.countDocuments(stageQueryConditions);
             const pages = Math.ceil(total / limitNumber);
-            // Procesar las conversaciones
-            const processedConversations = conversations.map((conversation) => {
-                var _a;
-                const conversationObj = conversation.toObject();
-                if (conversationObj.participants &&
-                    conversationObj.participants.contact &&
-                    typeof conversationObj.participants.contact.reference === "string") {
-                    conversationObj.participants.contact.displayInfo = {
-                        mobile: conversationObj.participants.contact.reference,
-                        name: conversationObj.participants.contact.reference,
+            // Conversaciones como objetos plain
+            const conversationObjs = conversations.map((c) => c.toObject());
+            // Batch de contactos para este stage
+            const refs = [
+                ...new Set(conversationObjs
+                    .map((o) => { var _a, _b; return (_b = (_a = o === null || o === void 0 ? void 0 : o.participants) === null || _a === void 0 ? void 0 : _a.contact) === null || _b === void 0 ? void 0 : _b.reference; })
+                    .filter(Boolean)),
+            ];
+            let contactsMap = {};
+            if (refs.length) {
+                try {
+                    const contacts = yield ContactModel_1.default.find({
+                        organizationId,
+                        $or: [
+                            { "properties.key": "mobile", "properties.value": { $in: refs } },
+                            { "properties.key": "phone", "properties.value": { $in: refs } },
+                        ],
+                    })
+                        .select("properties")
+                        .lean();
+                    for (const c of contacts) {
+                        for (const p of c.properties || []) {
+                            if ((p.key === "mobile" || p.key === "phone") &&
+                                refs.includes(p.value)) {
+                                contactsMap[p.value] = c;
+                            }
+                        }
+                    }
+                }
+                catch (error) {
+                    console.error("[KANBAN] Error buscando contactos en lote (init):", error);
+                }
+            }
+            // Enriquecer con displayInfo
+            const processedConversations = conversationObjs.map((o) => {
+                var _a, _b, _c;
+                const ref = (_b = (_a = o === null || o === void 0 ? void 0 : o.participants) === null || _a === void 0 ? void 0 : _a.contact) === null || _b === void 0 ? void 0 : _b.reference;
+                if (ref) {
+                    const c = contactsMap[ref];
+                    const findProp = (key) => { var _a, _b; return (_b = (_a = c === null || c === void 0 ? void 0 : c.properties) === null || _a === void 0 ? void 0 : _a.find((p) => p.key === key)) === null || _b === void 0 ? void 0 : _b.value; };
+                    o.participants.contact.displayInfo = {
+                        mobile: ref,
+                        name: findProp("firstName") || ref,
+                        lastName: findProp("lastName") || "",
+                        email: findProp("email") || "",
+                        position: findProp("position") || "",
+                        contactId: (c === null || c === void 0 ? void 0 : c._id) || null,
                     };
                 }
-                conversationObj.lastMessageTimestamp =
-                    (_a = conversationObj.lastMessage) === null || _a === void 0 ? void 0 : _a.timestamp;
-                conversationObj.mobile = conversationObj.participants.contact.reference;
-                return conversationObj;
+                o.lastMessageTimestamp = (_c = o.lastMessage) === null || _c === void 0 ? void 0 : _c.timestamp;
+                o.mobile = ref;
+                return o;
             });
-            // Obtener el último mensaje para cada conversación
-            const conversationsWithLastMessage = yield Promise.all(processedConversations.map((conversation) => __awaiter(void 0, void 0, void 0, function* () {
-                const lastMessage = yield MessageModel_1.default.findOne({
-                    $or: [
-                        { from: conversation.participants.contact.reference },
-                        { to: conversation.participants.contact.reference },
-                    ],
-                }).sort({ timestamp: -1 });
-                return Object.assign(Object.assign({}, conversation), { lastMessage: lastMessage || null });
-            })));
-            kanbanData[i].conversations = conversationsWithLastMessage;
+            // lastMessage ya viene poblado por .populate("lastMessage")
+            kanbanData[i].conversations = processedConversations;
             kanbanData[i].pagination = {
                 page: 1,
                 limit: limitNumber,

@@ -26,7 +26,6 @@ const apiUrl = process.env.WHATSAPP_API_URL;
 const sendCustomMessage = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     var _a;
     try {
-        console.log("[SEND_CUSTOM] Iniciando envío de mensaje personalizado");
         const { message, to, type: messageType, mediaUrl, file } = req.body;
         console.log(`[SEND_CUSTOM] Datos recibidos:
       - To: ${to}
@@ -272,6 +271,16 @@ const sendCustomMessage = (req, res) => __awaiter(void 0, void 0, void 0, functi
             console.log("[SEND_CUSTOM] Emitiendo evento de socket");
             const io = (0, socket_1.getSocketInstance)();
             io.emit("newMessage", Object.assign(Object.assign({}, outgoingMessage.toObject()), { direction: "outgoing" }));
+            // Actualizar la conversación con el último mensaje saliente
+            try {
+                yield ConversationModel_1.default.findByIdAndUpdate(conversation._id, {
+                    lastMessage: outgoingMessage._id,
+                    lastMessageTimestamp: outgoingMessage.timestamp,
+                }, { new: true });
+            }
+            catch (updateErr) {
+                console.error("[SEND_CUSTOM] Error actualizando lastMessage en conversación:", updateErr);
+            }
             return res.status(200).json(outgoingMessage);
         }
         else {

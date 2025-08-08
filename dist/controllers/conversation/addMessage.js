@@ -20,7 +20,7 @@ const createConversation_1 = require("../../services/conversations/createConvers
  * Agrega un nuevo mensaje a una conversación
  */
 const addMessage = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    var _a;
+    var _a, _b, _c, _d, _e, _f;
     try {
         console.log("[ADD_MESSAGE] Iniciando guardado de mensaje manual");
         const { conversationId } = req.params;
@@ -100,6 +100,16 @@ const addMessage = (req, res) => __awaiter(void 0, void 0, void 0, function* () 
         // Si es un mensaje entrante, incrementar el contador de no leídos
         if (direction === "incoming") {
             conversation.unreadCount = (conversation.unreadCount || 0) + 1;
+        }
+        // Si falta displayInfo del contacto, intentar enriquecerlo mínimamente (solo mobile)
+        try {
+            const ref = (_c = (_b = conversation === null || conversation === void 0 ? void 0 : conversation.participants) === null || _b === void 0 ? void 0 : _b.contact) === null || _c === void 0 ? void 0 : _c.reference;
+            if (ref && !((_f = (_e = (_d = conversation === null || conversation === void 0 ? void 0 : conversation.participants) === null || _d === void 0 ? void 0 : _d.contact) === null || _e === void 0 ? void 0 : _e.displayInfo) === null || _f === void 0 ? void 0 : _f.mobile)) {
+                conversation.participants.contact.displayInfo = Object.assign(Object.assign({}, conversation.participants.contact.displayInfo), { mobile: ref });
+            }
+        }
+        catch (e) {
+            console.warn("[ADD_MESSAGE] No se pudo enriquecer displayInfo:", e);
         }
         yield conversation.save();
         return res.status(201).json({

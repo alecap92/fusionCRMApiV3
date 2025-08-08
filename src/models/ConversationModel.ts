@@ -8,6 +8,14 @@ interface IParticipant {
   contact: {
     type: "Contact";
     reference: string;
+    displayInfo?: {
+      mobile?: string;
+      name?: string;
+      lastName?: string;
+      email?: string;
+      position?: string;
+      contactId?: string;
+    };
   };
 }
 
@@ -61,6 +69,14 @@ const participantSchema = new Schema<IParticipant>({
   contact: {
     type: { type: String, required: true, enum: ["Contact"] },
     reference: { type: String, required: true },
+    displayInfo: {
+      mobile: { type: String },
+      name: { type: String },
+      lastName: { type: String },
+      email: { type: String },
+      position: { type: String },
+      contactId: { type: String },
+    },
   },
 });
 
@@ -161,7 +177,12 @@ const conversationSchema = new Schema<IConversation>(
 
 // Índices para mejorar el rendimiento
 conversationSchema.index({ organization: 1 });
-conversationSchema.index({ pipeline: 1, currentStage: 1 });
+conversationSchema.index({
+  organization: 1,
+  pipeline: 1,
+  currentStage: 1,
+  lastMessageTimestamp: -1,
+});
 conversationSchema.index({ assignedTo: 1 });
 conversationSchema.index({ lastMessageTimestamp: -1 });
 conversationSchema.index({ isResolved: 1 });
