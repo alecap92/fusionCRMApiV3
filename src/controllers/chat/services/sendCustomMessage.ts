@@ -17,7 +17,7 @@ export const sendCustomMessage = async (
   res: Response
 ): Promise<Response> => {
   try {
-    const { message, to, type: messageType, mediaUrl, file } = req.body;
+    const { message, to, type: messageType, mediaUrl, file, caption } = req.body;
 
     console.log(`[SEND_CUSTOM] Datos recibidos:
       - To: ${to}
@@ -96,7 +96,7 @@ export const sendCustomMessage = async (
           type: "image",
           image: {
             link: mediaUrl,
-            caption: "", // Caption es opcional
+            caption: caption || "",
           },
           message: "imagen",
         };
@@ -136,7 +136,7 @@ export const sendCustomMessage = async (
           type: "document",
           document: {
             link: mediaUrl || "", // Usar mediaUrl si existe, sino ""
-            caption: "",
+            caption: caption || "",
           },
           message: "documento",
         };
@@ -154,7 +154,7 @@ export const sendCustomMessage = async (
           type: "video",
           video: {
             link: mediaUrl,
-            caption: "", // Caption es opcional
+            caption: caption || "", // Caption es opcional
           },
           message: "video",
         };
@@ -292,7 +292,7 @@ export const sendCustomMessage = async (
         organization: organization._id,
         from: integration.credentials.phoneNumber || "",
         to,
-        message: messageType === "text" ? message : mediaUrl,
+        message: messageType === "text" ? message : caption || "",
         direction: "outgoing",
         type: messageType,
         mediaUrl: mediaUrl || "",

@@ -128,9 +128,28 @@ export const handleWebhook = async (
         } else if (
           ["image", "document", "audio", "video", "sticker"].includes(type)
         ) {
-          text = `${capitalizeFirstLetter(type)} recibido`;
-
           const mediaObject = message[type];
+          console.log(
+            `[WEBHOOK] Media recibido tipo=${type}: ${JSON.stringify(
+              mediaObject || {},
+              null,
+              2
+            )}`
+          );
+
+          // Preferir caption cuando exista
+          const fallbackByType: Record<string, string> = {
+            image: "Imagen recibida",
+            document: "Documento recibido",
+            audio: "Audio recibido",
+            video: "Video recibido",
+            sticker: "Sticker recibido",
+          };
+          text =
+            mediaObject?.caption || fallbackByType[type] || "Archivo recibido";
+          console.log(
+            `[WEBHOOK] Caption detectado: "${mediaObject?.caption || "(sin caption)"}"`
+          );
 
           if (mediaObject?.id) {
             const mediaBuffer = await getMedia(mediaObject.id, accessToken);
