@@ -2,6 +2,9 @@ import { Request, Response } from "express";
 import IncomingMessageModel from "../../models/IncomingMessageModel";
 import { getSocketInstance } from "../../config/socket";
 import { FormResponseModel } from "../../models/FormResponse";
+import UserModel from "../../models/UserModel";
+import { Expo } from "expo-server-sdk";
+import { sendNotification } from "../chat/services/pushNotificationService";
 
 // Obtener las notificaciones iniciales para una organización
 export const getNotifications = async (req: Request, res: Response) => {
@@ -62,8 +65,6 @@ export const emitNewNotification = (
     contact, // Incluir el contacto para que el frontend pueda identificarlo
     message, // Incluir el mensaje completo
   });
-
-
 };
 
 // Controlador para manejar la llegada de un nuevo mensaje de WhatsApp
@@ -100,5 +101,42 @@ export const resetNotifications = async (req: Request, res: Response) => {
       message: "An error occurred while resetting notifications",
       error: error.message,
     });
+  }
+};
+
+// Enviar un push de prueba al usuario autenticado
+export const sendTestPush = async (req: Request, res: Response) => {
+  try {
+    const userId = (req as any).user?._id;
+    if (!userId) {
+      return res.status(401).json({ message: "No autorizado" });
+    }
+
+    const { title, body, data } = req.body || {};
+    const user = await UserModel.findById(userId, {
+      pushToken: 1,
+      firstName: 1,
+      lastName: 1,
+    });
+    const tokens: string[] = (user?.pushToken || []).filter(Boolean);
+    const validTokens = tokens.filter((t) => Expo.isExpoPushToken(t));
+
+    if (validTokens.length === 0) {
+      return res
+        .status(400)
+        .json({ message: "Usuario sin push tokens válidos" });
+    }
+
+    await sendNotification(validTokens, {
+      title: title || "Test Push",
+      body: body || "Hola desde backend",
+      data: data || { kind: "backend_test", ts: new Date().toISOString() },
+    });
+
+    return res.status(200).json({ success: true, sentTo: validTokens.length });
+  } catch (error: any) {
+    return res
+      .status(500)
+      .json({ message: "Error enviando push", error: error.message });
   }
 };
