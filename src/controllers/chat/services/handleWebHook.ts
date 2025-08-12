@@ -293,13 +293,35 @@ export const handleWebhook = async (
           `[SOCKET] Mensaje enviado a conversación ${conversation._id} y organización ${organization._id}`
         );
 
-        // Enviar notificación push (si hay tokens configurados)
-        const toTokens = ["ExponentPushToken[I5cjWVDWDbnjGPUqFdP2dL]"];
+        // Obtener tokens de push del usuario asignado
         try {
-          await sendNotification(toTokens, {
-            title: contactName,
-            body: text,
-          });
+          const assignedUserId = conversation.assignedTo;
+          const usersToNotify = await UserModel.find(
+            { _id: assignedUserId },
+            { pushToken: 1 }
+          );
+
+          const toTokens = usersToNotify
+            .flatMap((u) => u.pushToken || [])
+            .filter(Boolean)
+            .filter((t) => Expo.isExpoPushToken(t));
+
+          // Solo enviar si hay tokens válidos
+          if (toTokens.length > 0) {
+            await sendNotification(toTokens, {
+              title: contactName,
+              body: text,
+              data: {
+                conversationId: String(conversation._id),
+                type: "whatsapp_message",
+              },
+            });
+            console.log(
+              "[PUSH] Notificación enviada a",
+              toTokens.length,
+              "dispositivos"
+            );
+          }
         } catch (error) {
           console.error("[PUSH] Error enviando notificación:", error);
         }
