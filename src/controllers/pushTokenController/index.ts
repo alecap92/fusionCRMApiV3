@@ -37,11 +37,9 @@ export const createPushToken = async (req: Request, res: Response) => {
     return res.status(200).json({ message: "Push token saved successfully" });
   } catch (error) {
     console.error("Error saving push token:", error);
-    return res
-      .status(500)
-      .json({
-        error: "An unexpected error occurred while saving the push token",
-      });
+    return res.status(500).json({
+      error: "An unexpected error occurred while saving the push token",
+    });
   }
 };
 
@@ -74,10 +72,8 @@ export const deletePushToken = async (req: Request, res: Response) => {
     return res.status(200).json({ message: "Push token deleted successfully" });
   } catch (error) {
     console.error("[PUSH] Error eliminando token:", error);
-    return res
-      .status(500)
-      .json({
-        error: "An unexpected error occurred while deleting the push token",
-      });
+    return res.status(500).json({
+      error: "An unexpected error occurred while deleting the push token",
+    });
   }
 };

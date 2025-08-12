@@ -20,7 +20,7 @@ export const sendNotification = async (
     sound: "default",
     body: body,
     title: title,
-    data: data || {},
+    data: data,
   }));
 
   let chunks = expo.chunkPushNotifications(messages);

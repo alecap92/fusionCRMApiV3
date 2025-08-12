@@ -315,7 +315,7 @@ export const handleWebhook = async (
                 conversationId: String(conversation._id),
                 type: "whatsapp_message",
               },
-            });
+            } as any);
             console.log(
               "[PUSH] Notificación enviada a",
               toTokens.length,
