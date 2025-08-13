@@ -7,8 +7,8 @@ import {
 
 const router: Router = Router();
 
+router.post("/test-push", sendTestPush);
 router.get("/", getNotifications);
 router.post("/reset", resetNotifications);
-router.post("/test-push", sendTestPush);
 
 export default router;
