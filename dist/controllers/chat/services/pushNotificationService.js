@@ -12,16 +12,17 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.sendNotification = void 0;
 const expo_server_sdk_1 = require("expo-server-sdk");
 const expo = new expo_server_sdk_1.Expo({ useFcmV1: true });
-const sendNotification = (toTokens_1, _a) => __awaiter(void 0, [toTokens_1, _a], void 0, function* (toTokens, { title, body }) {
-    const areExpoTokens = toTokens.every(token => expo_server_sdk_1.Expo.isExpoPushToken(token));
+const sendNotification = (toTokens_1, _a) => __awaiter(void 0, [toTokens_1, _a], void 0, function* (toTokens, { title, body, data, }) {
+    const areExpoTokens = toTokens.every((token) => expo_server_sdk_1.Expo.isExpoPushToken(token));
     if (!areExpoTokens) {
-        throw new Error('Invalid Expo push token');
+        throw new Error("Invalid Expo push token");
     }
-    const messages = toTokens.map(token => ({
+    const messages = toTokens.map((token) => ({
         to: token,
-        sound: 'default',
+        sound: "default",
         body: body,
         title: title,
+        data: data,
     }));
     let chunks = expo.chunkPushNotifications(messages);
     let tickets = [];
@@ -31,8 +32,8 @@ const sendNotification = (toTokens_1, _a) => __awaiter(void 0, [toTokens_1, _a],
             tickets.push(ticketChunk);
         }
         catch (error) {
-            console.error('Error sending push notification chunks', error);
-            throw new Error('Error sending push notification');
+            console.error("Error sending push notification chunks", error);
+            throw new Error("Error sending push notification");
         }
     }
     return { done: true };

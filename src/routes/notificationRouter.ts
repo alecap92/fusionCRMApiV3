@@ -7,6 +7,8 @@ import {
 
 const router: Router = Router();
 
+console.log("notificationRouter");
+
 router.post("/test-push", sendTestPush);
 router.get("/", getNotifications);
 router.post("/reset", resetNotifications);

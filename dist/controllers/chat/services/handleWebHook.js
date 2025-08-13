@@ -51,11 +51,13 @@ const MessageModel_1 = __importDefault(require("../../../models/MessageModel"));
 const getMedia_1 = require("./getMedia");
 const notificationController_1 = require("../../notifications/notificationController");
 const aws_1 = require("../../../config/aws");
+const expo_server_sdk_1 = require("expo-server-sdk");
 const pushNotificationService_1 = require("./pushNotificationService");
 const IntegrationsModel_1 = __importDefault(require("../../../models/IntegrationsModel"));
 const ConversationModel_1 = __importDefault(require("../../../models/ConversationModel"));
 const ConversationPipelineModel_1 = __importDefault(require("../../../models/ConversationPipelineModel"));
 const socket_1 = require("../../../config/socket");
+const UserModel_1 = __importDefault(require("../../../models/UserModel"));
 const createConversation_1 = require("../../../services/conversations/createConversation");
 const handleWebhook = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k;
@@ -141,8 +143,19 @@ const handleWebhook = (req, res) => __awaiter(void 0, void 0, void 0, function* 
                     text = message.text.body;
                 }
                 else if (["image", "document", "audio", "video", "sticker"].includes(type)) {
-                    text = `${capitalizeFirstLetter(type)} recibido`;
                     const mediaObject = message[type];
+                    console.log(`[WEBHOOK] Media recibido tipo=${type}: ${JSON.stringify(mediaObject || {}, null, 2)}`);
+                    // Preferir caption cuando exista
+                    const fallbackByType = {
+                        image: "Imagen recibida",
+                        document: "Documento recibido",
+                        audio: "Audio recibido",
+                        video: "Video recibido",
+                        sticker: "Sticker recibido",
+                    };
+                    text =
+                        (mediaObject === null || mediaObject === void 0 ? void 0 : mediaObject.caption) || fallbackByType[type] || "Archivo recibido";
+                    console.log(`[WEBHOOK] Caption detectado: "${(mediaObject === null || mediaObject === void 0 ? void 0 : mediaObject.caption) || "(sin caption)"}"`);
                     if (mediaObject === null || mediaObject === void 0 ? void 0 : mediaObject.id) {
                         const mediaBuffer = yield (0, getMedia_1.getMedia)(mediaObject.id, accessToken);
                         awsUrl = yield (0, aws_1.subirArchivo)(mediaBuffer, mediaObject.id, mediaObject.mime_type);
@@ -257,13 +270,26 @@ const handleWebhook = (req, res) => __awaiter(void 0, void 0, void 0, function* 
                     conversationId: conversation._id,
                 });
                 console.log(`[SOCKET] Mensaje enviado a conversación ${conversation._id} y organización ${organization._id}`);
-                // Enviar notificación push (si hay tokens configurados)
-                const toTokens = ["ExponentPushToken[I5cjWVDWDbnjGPUqFdP2dL]"];
+                // Obtener tokens de push del usuario asignado
                 try {
-                    yield (0, pushNotificationService_1.sendNotification)(toTokens, {
-                        title: contactName,
-                        body: text,
-                    });
+                    const assignedUserId = conversation.assignedTo;
+                    const usersToNotify = yield UserModel_1.default.find({ _id: assignedUserId }, { pushToken: 1 });
+                    const toTokens = usersToNotify
+                        .flatMap((u) => u.pushToken || [])
+                        .filter(Boolean)
+                        .filter((t) => expo_server_sdk_1.Expo.isExpoPushToken(t));
+                    // Solo enviar si hay tokens válidos
+                    if (toTokens.length > 0) {
+                        yield (0, pushNotificationService_1.sendNotification)(toTokens, {
+                            title: contactName,
+                            body: text,
+                            data: {
+                                conversationId: String(conversation._id),
+                                type: "whatsapp_message",
+                            },
+                        });
+                        console.log("[PUSH] Notificación enviada a", toTokens.length, "dispositivos");
+                    }
                 }
                 catch (error) {
                     console.error("[PUSH] Error enviando notificación:", error);

@@ -26,7 +26,7 @@ const apiUrl = process.env.WHATSAPP_API_URL;
 const sendCustomMessage = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     var _a;
     try {
-        const { message, to, type: messageType, mediaUrl, file } = req.body;
+        const { message, to, type: messageType, mediaUrl, file, caption } = req.body;
         console.log(`[SEND_CUSTOM] Datos recibidos:
       - To: ${to}
       - Type: ${messageType}
@@ -89,7 +89,7 @@ const sendCustomMessage = (req, res) => __awaiter(void 0, void 0, void 0, functi
                     type: "image",
                     image: {
                         link: mediaUrl,
-                        caption: "", // Caption es opcional
+                        caption: caption || "",
                     },
                     message: "imagen",
                 };
@@ -124,7 +124,7 @@ const sendCustomMessage = (req, res) => __awaiter(void 0, void 0, void 0, functi
                     type: "document",
                     document: {
                         link: mediaUrl || "", // Usar mediaUrl si existe, sino ""
-                        caption: "",
+                        caption: caption || "",
                     },
                     message: "documento",
                 };
@@ -141,7 +141,7 @@ const sendCustomMessage = (req, res) => __awaiter(void 0, void 0, void 0, functi
                     type: "video",
                     video: {
                         link: mediaUrl,
-                        caption: "", // Caption es opcional
+                        caption: caption || "", // Caption es opcional
                     },
                     message: "video",
                 };
@@ -259,7 +259,7 @@ const sendCustomMessage = (req, res) => __awaiter(void 0, void 0, void 0, functi
                 organization: organization._id,
                 from: integration.credentials.phoneNumber || "",
                 to,
-                message: messageType === "text" ? message : mediaUrl,
+                message: messageType === "text" ? message : caption || "",
                 direction: "outgoing",
                 type: messageType,
                 mediaUrl: mediaUrl || "",

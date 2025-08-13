@@ -12,14 +12,18 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.resetNotifications = exports.emitNewNotification = exports.getNotifications = void 0;
+exports.sendTestPush = exports.resetNotifications = exports.emitNewNotification = exports.getNotifications = void 0;
 const IncomingMessageModel_1 = __importDefault(require("../../models/IncomingMessageModel"));
 const socket_1 = require("../../config/socket");
 const FormResponse_1 = require("../../models/FormResponse");
+const UserModel_1 = __importDefault(require("../../models/UserModel"));
+const expo_server_sdk_1 = require("expo-server-sdk");
+const pushNotificationService_1 = require("../chat/services/pushNotificationService");
 // Obtener las notificaciones iniciales para una organización
 const getNotifications = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     var _a;
     try {
+        console.log("getNotifications");
         const organizationId = (_a = req.user) === null || _a === void 0 ? void 0 : _a.organizationId;
         // Obtener conteo de mensajes de WhatsApp no leídos
         const unreadWhatsapp = yield IncomingMessageModel_1.default.countDocuments({
@@ -96,3 +100,38 @@ const resetNotifications = (req, res) => __awaiter(void 0, void 0, void 0, funct
     }
 });
 exports.resetNotifications = resetNotifications;
+// Enviar un push de prueba al usuario autenticado
+const sendTestPush = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a;
+    try {
+        const userId = (_a = req.user) === null || _a === void 0 ? void 0 : _a._id;
+        if (!userId) {
+            return res.status(401).json({ message: "No autorizado" });
+        }
+        const { title, body, data } = req.body || {};
+        const user = yield UserModel_1.default.findById(userId, {
+            pushToken: 1,
+            firstName: 1,
+            lastName: 1,
+        });
+        const tokens = ((user === null || user === void 0 ? void 0 : user.pushToken) || []).filter(Boolean);
+        const validTokens = tokens.filter((t) => expo_server_sdk_1.Expo.isExpoPushToken(t));
+        if (validTokens.length === 0) {
+            return res
+                .status(400)
+                .json({ message: "Usuario sin push tokens válidos" });
+        }
+        yield (0, pushNotificationService_1.sendNotification)(validTokens, {
+            title: title || "Test Push",
+            body: body || "Hola desde backend",
+            data: data || { kind: "backend_test", ts: new Date().toISOString() },
+        });
+        return res.status(200).json({ success: true, sentTo: validTokens.length });
+    }
+    catch (error) {
+        return res
+            .status(500)
+            .json({ message: "Error enviando push", error: error.message });
+    }
+});
+exports.sendTestPush = sendTestPush;

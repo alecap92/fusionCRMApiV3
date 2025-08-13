@@ -9,6 +9,7 @@ import { sendNotification } from "../chat/services/pushNotificationService";
 // Obtener las notificaciones iniciales para una organización
 export const getNotifications = async (req: Request, res: Response) => {
   try {
+    console.log("getNotifications");
     const organizationId = req.user?.organizationId;
 
     // Obtener conteo de mensajes de WhatsApp no leídos

@@ -46,7 +46,9 @@ const createPushToken = (req, res) => __awaiter(void 0, void 0, void 0, function
     }
     catch (error) {
         console.error("Error saving push token:", error);
-        return res.status(500).json({ error: "An unexpected error occurred while saving the push token" });
+        return res.status(500).json({
+            error: "An unexpected error occurred while saving the push token",
+        });
     }
 });
 exports.createPushToken = createPushToken;
@@ -57,11 +59,24 @@ const deletePushToken = (req, res) => __awaiter(void 0, void 0, void 0, function
         if (!user) {
             return res.status(401).json({ error: "User not authenticated" });
         }
-        yield UserModel_1.default.updateOne({ _id: user._id }, { $set: { pushToken: null } });
-        return res.status(200).json({ message: "Push token deleted" });
+        if (!token) {
+            return res.status(400).json({ error: "Token is required" });
+        }
+        // Usar $pull para remover el token específico del array
+        const result = yield UserModel_1.default.updateOne({ _id: user._id }, { $pull: { pushToken: token } });
+        if (result.modifiedCount === 0) {
+            return res
+                .status(404)
+                .json({ message: "Token not found or already removed" });
+        }
+        console.log("[PUSH] Token eliminado para usuario:", user._id);
+        return res.status(200).json({ message: "Push token deleted successfully" });
     }
     catch (error) {
-        console.log(error);
+        console.error("[PUSH] Error eliminando token:", error);
+        return res.status(500).json({
+            error: "An unexpected error occurred while deleting the push token",
+        });
     }
 });
 exports.deletePushToken = deletePushToken;

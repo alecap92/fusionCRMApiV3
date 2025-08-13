@@ -77,6 +77,7 @@ const configureMiddleware = (app) => {
         }
     });
 };
+console.log("routes", routes_1.default);
 // Configuración de rutas
 const configureRoutes = (app) => {
     // Rutas que requieren autenticación

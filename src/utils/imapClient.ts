@@ -381,11 +381,6 @@ export const listenForNewEmails = async () => {
         invalidUsers++;
       }
     }
-
-    console.log(`📊 Resumen de conexiones IMAP:`);
-    console.log(`  ✅ Usuarios conectados: ${validUsers}`);
-    console.log(`  ❌ Usuarios omitidos/fallidos: ${invalidUsers}`);
-    console.log(`  📧 Total conexiones activas: ${activeConnections.size}`);
   } catch (error) {
     console.error("Error setting up email listeners:", error);
   }

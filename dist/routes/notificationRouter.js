@@ -3,6 +3,8 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = require("express");
 const notificationController_1 = require("../controllers/notifications/notificationController");
 const router = (0, express_1.Router)();
+console.log("notificationRouter");
+router.post("/test-push", notificationController_1.sendTestPush);
 router.get("/", notificationController_1.getNotifications);
 router.post("/reset", notificationController_1.resetNotifications);
 exports.default = router;
