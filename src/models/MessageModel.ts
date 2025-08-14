@@ -14,6 +14,8 @@ interface IMessage extends Document {
   message: string;
   mediaUrl?: string;
   mediaId?: string;
+  filename?: string;
+  mimeType?: string;
   latitude?: number;
   longitude?: number;
   timestamp: Date;
@@ -46,6 +48,8 @@ const messageSchema = new Schema<IMessage>({
   message: { type: String, required: true },
   mediaUrl: { type: String },
   mediaId: { type: String },
+  filename: { type: String },
+  mimeType: { type: String },
   latitude: { type: Number },
   longitude: { type: Number },
   timestamp: { type: Date, required: true, default: Date.now },

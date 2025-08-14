@@ -28,8 +28,6 @@ if (missingFields.length > 0) {
   console.error(
     "🔧 Asegúrate de configurar estas variables en el .env del backend"
   );
-} else {
-  console.log("✅ Firebase Admin: Configuración completa");
 }
 
 // Inicializar Firebase Admin solo si no está ya inicializado
@@ -38,7 +36,6 @@ if (!admin.apps.length) {
     admin.initializeApp({
       credential: admin.credential.cert(firebaseConfig as admin.ServiceAccount),
     });
-    console.log("✅ Firebase Admin inicializado correctamente");
   } catch (error) {
     console.error("❌ Error inicializando Firebase Admin:", error);
   }

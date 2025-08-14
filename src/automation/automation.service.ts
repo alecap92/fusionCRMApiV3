@@ -16,7 +16,6 @@ export async function ejecutarNodo(
   }
 
   if (nodo.type === "trigger") {
-    console.log("⏭️ Nodo trigger, saltando ejecución. Pasando al siguiente...");
     const siguientes = nodo.next || [];
     for (const nextId of siguientes) {
       await ejecutarNodo(nextId, nodesMap, context);
@@ -30,7 +29,6 @@ export async function ejecutarNodo(
     return;
   }
 
-  console.log(`▶️ Ejecutando nodo: ${nodo.id} [${nodo.type}]`);
   const resultado = await handler(nodo, context);
 
   let siguientes: string[] = [];

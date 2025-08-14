@@ -4,7 +4,6 @@ import AutomationModel, {
 } from "../../models/AutomationModel";
 import ConversationModel from "../../models/ConversationModel";
 import MessageModel from "../../models/MessageModel";
-import axios from "axios";
 import { AutomationService } from "../conversations/automationService";
 
 interface ExecutionContext {
@@ -32,10 +31,6 @@ export class AutomationExecutor {
     isFirstMessage: boolean = false
   ): Promise<void> {
     try {
-      console.log(
-        `[AutomationExecutor] Procesando mensaje: "${message}" de ${contactNumber}`
-      );
-
       // Buscar automatizaciones activas de tipo conversación para esta organización
       const automations = await AutomationModel.find({
         organizationId,
@@ -51,10 +46,6 @@ export class AutomationExecutor {
         ],
       });
 
-      console.log(
-        `[AutomationExecutor] Encontradas ${automations.length} automatizaciones activas`
-      );
-
       // Buscar conversación
       const conversation = await ConversationModel.findById(conversationId);
       if (!conversation) {
@@ -68,9 +59,6 @@ export class AutomationExecutor {
       };
 
       if (automationSettings.isPaused) {
-        console.log(
-          `[AutomationExecutor] Automatizaciones pausadas para conversación ${conversationId}`
-        );
         return;
       }
 
@@ -96,9 +84,6 @@ export class AutomationExecutor {
         );
 
         if (shouldExecute) {
-          console.log(
-            `[AutomationExecutor] Ejecutando automatización: ${automation.name}`
-          );
           await this.executeAutomation(automation, context);
         }
       }
@@ -174,10 +159,6 @@ export class AutomationExecutor {
     context: ExecutionContext
   ): Promise<void> {
     try {
-      console.log(
-        `[AutomationExecutor] Iniciando ejecución: ${automation.name}`
-      );
-
       // Verificar si se puede ejecutar basándose en el historial
       const conversation = await ConversationModel.findById(
         context.conversationId
@@ -195,9 +176,6 @@ export class AutomationExecutor {
       });
 
       if (!canTrigger) {
-        console.log(
-          `[AutomationExecutor] Automatización ya ejecutada recientemente, omitiendo`
-        );
         return;
       }
 
@@ -235,10 +213,6 @@ export class AutomationExecutor {
     automation: IAutomation,
     context: ExecutionContext
   ): Promise<void> {
-    console.log(
-      `[AutomationExecutor] Ejecutando flujo visual con ${automation.nodes.length} nodos`
-    );
-
     // Encontrar el nodo trigger
     const triggerNode = automation.nodes.find((n) => n.type === "trigger");
     if (!triggerNode) {
@@ -258,10 +232,6 @@ export class AutomationExecutor {
     allNodes: IAutomationNode[],
     context: ExecutionContext
   ): Promise<void> {
-    console.log(
-      `[AutomationExecutor] Ejecutando nodo: ${node.id} (${node.type})`
-    );
-
     // Ejecutar según el tipo de nodo
     switch (node.type) {
       case "trigger":
@@ -286,7 +256,6 @@ export class AutomationExecutor {
 
       case "delay":
         const delayMs = (node.data?.delay || 5) * 1000;
-        console.log(`[AutomationExecutor] Esperando ${delayMs}ms`);
         await new Promise((resolve) => setTimeout(resolve, delayMs));
         break;
     }
@@ -314,10 +283,6 @@ export class AutomationExecutor {
       const message = this.processTemplate(
         node.data?.message || "",
         context.variables
-      );
-
-      console.log(
-        `[AutomationExecutor] Enviando mensaje WhatsApp: "${message}" a ${context.contactNumber}`
       );
 
       try {
@@ -426,10 +391,6 @@ export class AutomationExecutor {
       const message = this.processTemplate(
         node.data?.message || "",
         context.variables
-      );
-
-      console.log(
-        `[AutomationExecutor] Enviando mensaje WhatsApp: "${message}" a ${context.contactNumber}`
       );
 
       try {

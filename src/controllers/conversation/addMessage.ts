@@ -12,7 +12,6 @@ export const addMessage = async (
   res: Response
 ) => {
   try {
-    console.log("[ADD_MESSAGE] Iniciando guardado de mensaje manual");
     const { conversationId } = req.params;
     const {
       from,
@@ -28,14 +27,7 @@ export const addMessage = async (
       messageId,
     } = req.body;
 
-    console.log(`[ADD_MESSAGE] Datos recibidos: 
-      - From: ${from}
-      - To: ${to}
-      - Type: ${type}
-      - Direction: ${direction}
-      - MessageId: ${messageId}
-      - ConversationId: ${conversationId}
-    `);
+    // Validación y trazas mínimas
 
     const organizationId = req.organization;
     const userId = req.user?._id;
@@ -74,9 +66,6 @@ export const addMessage = async (
       });
 
       if (existingMessage) {
-        console.log(
-          `[ADD_MESSAGE] Mensaje duplicado detectado, messageId: ${messageId}`
-        );
         return res.status(409).json({
           success: false,
           message: "Mensaje duplicado",
@@ -85,7 +74,7 @@ export const addMessage = async (
     }
 
     // Crear el nuevo mensaje
-    console.log("[ADD_MESSAGE] Creando nuevo mensaje en la base de datos");
+    // Creando nuevo mensaje en la base de datos
     const newMessage = new Message({
       user: userId,
       organization: organizationId,
@@ -106,12 +95,9 @@ export const addMessage = async (
     });
 
     await newMessage.save();
-    console.log(
-      `[ADD_MESSAGE] Mensaje guardado exitosamente con ID: ${newMessage._id}`
-    );
 
     // Actualizar la conversación con la referencia al último mensaje
-    console.log("[ADD_MESSAGE] Actualizando conversación con el nuevo mensaje");
+    // Actualizando conversación con el nuevo mensaje
     conversation.lastMessage = newMessage._id as any;
     conversation.lastMessageTimestamp = newMessage.timestamp;
 

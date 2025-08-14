@@ -5,10 +5,5 @@ export default async function sendEmail(nodo: any, context: any) {
   const subject = renderText(nodo.subject, context);
   const body = renderText(nodo.emailBody, context);
 
-  console.log("📧 Enviando email:");
-  console.log("Para:", to);
-  console.log("Asunto:", subject);
-  console.log("Mensaje:", body);
-
   // Aquí conectas con tu servicio de correo real si lo deseas
 }

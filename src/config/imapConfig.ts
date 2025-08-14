@@ -23,7 +23,7 @@ export const connectToInbox = (
   });
 
   imap.once("end", () => {
-    console.log("Connection ended");
+    // Connection ended
   });
 
   imap.connect();

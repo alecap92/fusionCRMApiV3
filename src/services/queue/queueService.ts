@@ -45,7 +45,7 @@ export class QueueService {
     });
 
     connection.on("connect", () => {
-      console.log("Successfully connected to Redis");
+      // Conexión exitosa a Redis
     });
 
     // Crear worker para procesar los trabajos
@@ -65,8 +65,6 @@ export class QueueService {
 
     // Configurar manejadores de eventos
     this.setupEventHandlers();
-
-    console.log("📋 Servicio de colas para automatizaciones inicializado");
   }
 
   /**
@@ -111,9 +109,6 @@ export class QueueService {
         }
       );
 
-      console.log(
-        `📝 Ejecución retrasada añadida a la cola: ${job.id} (${delayMinutes} minutos)`
-      );
       return job.id as string;
     } catch (error) {
       console.error("Error al añadir trabajo a la cola:", error);
@@ -127,8 +122,6 @@ export class QueueService {
   private async processDelayedExecution(
     job: Job<DelayedExecutionJob>
   ): Promise<void> {
-    console.log(`⏱️ Procesando ejecución retrasada: ${job.id}`);
-
     const { executionId, automationId, context, nextNodes, allNodes } =
       job.data;
 
@@ -145,9 +138,6 @@ export class QueueService {
       // Verificar si tenemos todos los nodos. Si no, cargarlos desde la base de datos
       let nodesForExecution = allNodes;
       if (!nodesForExecution || nodesForExecution.length === 0) {
-        console.log(
-          "No se recibieron nodos en el job, cargando desde la base de datos..."
-        );
         try {
           const AutomationModel =
             require("../../models/AutomationModel").default;
@@ -156,9 +146,6 @@ export class QueueService {
             throw new Error(`Automatización no encontrada: ${automationId}`);
           }
           nodesForExecution = automation.nodes;
-          console.log(
-            `Cargados ${nodesForExecution.length} nodos desde la base de datos`
-          );
         } catch (loadError) {
           console.error(
             "Error cargando nodos desde la base de datos:",
@@ -180,13 +167,10 @@ export class QueueService {
           //   nodesForExecution,
           //   context
           // );
-          console.log(`TODO: Ejecutar nodo ${nextNodeId} después de delay`);
         } else {
           console.error(`❌ Nodo siguiente no encontrado: ${nextNodeId}`);
         }
       }
-
-      console.log(`✅ Ejecución retrasada completada: ${job.id}`);
     } catch (error) {
       console.error(
         `❌ Error procesando ejecución retrasada ${job.id}:`,
@@ -202,7 +186,7 @@ export class QueueService {
   private setupEventHandlers() {
     // Eventos de la cola
     this.queueEvents.on("completed", ({ jobId }) => {
-      console.log(`✅ Trabajo completado: ${jobId}`);
+      // Trabajo completado exitosamente
     });
 
     this.queueEvents.on("failed", ({ jobId, failedReason }) => {
@@ -222,7 +206,6 @@ export class QueueService {
     await this.delayWorker.close();
     await this.delayQueue.close();
     await this.queueEvents.close();
-    console.log("📋 Servicio de colas cerrado correctamente");
   }
 }
 

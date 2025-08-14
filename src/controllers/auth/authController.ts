@@ -254,13 +254,7 @@ export const logoutAllDevices = async (req: IAuthRequest, res: Response) => {
     const userId = req.user?._id;
     const organizationId = req.user?.organizationId;
 
-    console.log("[LogoutAll] Iniciando proceso con:", {
-      userId,
-      organizationId,
-    });
-
     if (!userId || !organizationId) {
-      console.log("[LogoutAll] Error: Usuario no autenticado");
       return res.status(401).json({
         success: false,
         message: "Usuario no autenticado",
@@ -271,13 +265,7 @@ export const logoutAllDevices = async (req: IAuthRequest, res: Response) => {
     // Obtener la organización y sus empleados
     const organization = await OrganizationModel.findById(organizationId);
 
-    console.log("[LogoutAll] Organización encontrada:", {
-      organizationId,
-      employeesCount: organization?.employees?.length || 0,
-    });
-
     if (!organization) {
-      console.log("[LogoutAll] Error: Organización no encontrada");
       return res.status(404).json({
         success: false,
         message: "Organización no encontrada",
@@ -291,8 +279,6 @@ export const logoutAllDevices = async (req: IAuthRequest, res: Response) => {
       lastLogoutAt: { $exists: false },
     });
 
-    console.log(`[LogoutAll] Usuarios activos encontrados: ${users.length}`);
-
     // Actualizar el timestamp de último logout para todos los empleados
     const currentTime = new Date();
     const updateResult = await UserModel.updateMany(
@@ -303,8 +289,6 @@ export const logoutAllDevices = async (req: IAuthRequest, res: Response) => {
       }
     );
 
-    console.log("[LogoutAll] Resultado de la actualización:", updateResult);
-
     // Registrar los resultados
     const logoutSummary = {
       totalEmployees: organization.employees.length,
@@ -313,8 +297,6 @@ export const logoutAllDevices = async (req: IAuthRequest, res: Response) => {
       timestamp: currentTime,
       organizationId: organizationId.toString(),
     };
-
-    console.log("[LogoutAll] Resumen de la operación:", logoutSummary);
 
     // Guardar el registro de la operación
     await LogModel.create({

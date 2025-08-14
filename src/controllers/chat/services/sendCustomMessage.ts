@@ -19,11 +19,7 @@ export const sendCustomMessage = async (
   try {
     const { message, to, type: messageType, mediaUrl, file, caption } = req.body;
 
-    console.log(`[SEND_CUSTOM] Datos recibidos:
-      - To: ${to}
-      - Type: ${messageType}
-      - MediaUrl: ${mediaUrl || "N/A"}
-    `);
+    // Datos básicos para depuración
 
     if (!to || !messageType || (messageType === "text" && !message)) {
       console.error("[SEND_CUSTOM] Faltan parámetros requeridos");
@@ -130,13 +126,61 @@ export const sendCustomMessage = async (
           }
         }
 
+        // Aceptar metadatos del cliente cuando no se sube el archivo aquí
+        const clientFilename = (req.body.filename as string) || undefined;
+        const clientMimeType = (req.body.mimeType as string) || undefined;
+
+        // Si el archivo viene subido en el cuerpo, preferimos mantener su nombre
+        let documentLink = mediaUrl || "";
+        let finalFilename = clientFilename;
+        let finalMimeType = clientMimeType;
+        if (file) {
+          // Subir a S3 usando el nombre original
+          const { subirArchivo } = await import("../../../config/aws");
+          documentLink = await subirArchivo(
+            (file as any).buffer,
+            file.originalname || file.filename || "document",
+            file.mimetype || "application/octet-stream"
+          );
+          finalFilename = file.originalname || file.filename;
+          finalMimeType = file.mimetype;
+        }
+
+        // Si no hay filename aún, intentar deducirlo desde la URL
+        if (!finalFilename && documentLink) {
+          try {
+            const pathPart = decodeURIComponent(new URL(documentLink).pathname);
+            const last = pathPart.split("/").pop() || "";
+            finalFilename = last || undefined;
+          } catch {}
+        }
+
+        // Si no hay mimeType, deducir por extensión básica
+        if (!finalMimeType && finalFilename) {
+          const ext = (finalFilename.split(".").pop() || "").toLowerCase();
+          const map: Record<string, string> = {
+            pdf: "application/pdf",
+            ps: "application/postscript",
+            doc: "application/msword",
+            docx:
+              "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            xls: "application/vnd.ms-excel",
+            xlsx:
+              "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            txt: "text/plain",
+            csv: "text/csv",
+          };
+          finalMimeType = map[ext];
+        }
+
         payload = {
           messaging_product: "whatsapp",
           to,
           type: "document",
           document: {
-            link: mediaUrl || "", // Usar mediaUrl si existe, sino ""
+            link: documentLink, // Enlace del documento subido o mediaUrl
             caption: caption || "",
+            ...(finalFilename ? { filename: finalFilename } : {}),
           },
           message: "documento",
         };
@@ -268,7 +312,7 @@ export const sendCustomMessage = async (
     }
 
     if (response.status === 200 || response.status === 201) {
-      console.log("[SEND_CUSTOM] Mensaje enviado exitosamente a WhatsApp API");
+      // Enviado a WhatsApp API
 
       // Verificar si ya existe un mensaje con este ID
       if (messageId) {
@@ -278,14 +322,12 @@ export const sendCustomMessage = async (
         });
 
         if (existingMessage) {
-          console.log(
-            `[SEND_CUSTOM] Mensaje duplicado detectado, messageId: ${messageId}`
-          );
+          // Duplicado detectado
           return res.status(409).json({ error: "Mensaje duplicado" });
         }
       }
 
-      console.log("[SEND_CUSTOM] Guardando mensaje en la base de datos");
+      // Guardando mensaje
       // Crear y almacenar el mensaje usando el nuevo MessageModel
       const outgoingMessage = await MessageModel.create({
         user: user._id,
@@ -296,16 +338,15 @@ export const sendCustomMessage = async (
         direction: "outgoing",
         type: messageType,
         mediaUrl: mediaUrl || "",
+        filename: (payload as any)?.document?.filename,
+        mimeType:
+          (req.body.mimeType as string) || (payload as any)?.document?.mime_type,
         timestamp: new Date().toISOString(),
         messageId: messageId,
         conversation: conversation?._id,
       });
 
-      console.log(
-        `[SEND_CUSTOM] Mensaje guardado exitosamente con ID: ${outgoingMessage._id}`
-      );
-
-      console.log("[SEND_CUSTOM] Emitiendo evento de socket");
+      // Emitiendo evento de socket
       const io = getSocketInstance();
       io.emit("newMessage", {
         ...outgoingMessage.toObject(),

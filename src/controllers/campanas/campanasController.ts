@@ -101,8 +101,6 @@ export const deleteCampana = async (req: Request, res: Response) => {
 export const createCampana = async (req: Request, res: Response) => {
   const campana = req.body;
 
-  console.log(campana);
-
   const organizationId = req.user?.organizationId;
   const userId = req.user?._id;
 
@@ -119,7 +117,6 @@ export const createCampana = async (req: Request, res: Response) => {
     await newCampana.save();
     res.status(201).json(newCampana);
   } catch (error) {
-    console.log(error);
     handleError(res, error);
   }
 };

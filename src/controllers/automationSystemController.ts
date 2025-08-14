@@ -320,9 +320,6 @@ export const executeAutomation = async (req: Request, res: Response) => {
     } else {
       // Para automatizaciones visuales/workflow, usar el servicio de ejecución existente
       // TODO: Implementar ejecución para automatizaciones de workflow
-      console.log(
-        "Ejecución de automatizaciones de workflow no implementada aún"
-      );
     }
 
     // Actualizar estadísticas

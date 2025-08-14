@@ -6,8 +6,6 @@ export const createActivity = async (req: Request, res: Response) => {
   try {
     const organizationId = req.user?.organizationId;
 
-    console.log(req.body);
-
     const form = {
       activityType: req.body.activityType,
       title: req.body.title,
@@ -68,7 +66,6 @@ export const getActivity = async (req: Request, res: Response) => {
 
 // Actualizar actividad
 export const updateActivity = async (req: Request, res: Response) => {
-  console.log(req.body);
   try {
     const updatedActivity = await Activity.findOneAndUpdate(
       { _id: req.body._id },

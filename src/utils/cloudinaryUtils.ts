@@ -5,7 +5,6 @@ import { v2 as cloudinary } from "cloudinary";
 export const deleteMediaFromCloudinary = async (
   mediaIds: string[]
 ): Promise<void> => {
-  console.log(mediaIds, "mediaIds");
   try {
     await Promise.all(
       mediaIds.map(async (mediaId) => {

@@ -2,7 +2,6 @@ import { Request, Response } from "express";
 import XLSX from "xlsx";
 import ContactModel from "../../models/ContactModel";
 export const importContacts = async (req: Request, res: Response) => {
-  console.log(req.user);
   const userId = req.user?._id;
   const organizationId = req.user?.organizationId;
 

@@ -210,8 +210,6 @@ export const initializeSocket = (server: HttpServer): SocketIOInstance => {
     cors: CONFIG.CORS,
   });
 
-  console.log("Socket.IO inicializado correctamente");
-
   // Configurar el evento de conexión
   io.on("connection", handleNewConnection);
 
@@ -278,7 +276,6 @@ export const closeSocketConnection = (): void => {
     io.disconnectSockets(true);
     io.close();
     io = null;
-    console.log("Socket.IO cerrado correctamente");
   }
 };
 

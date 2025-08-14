@@ -72,14 +72,10 @@ export const productAcquisitionController = {
         query.status = status;
       }
 
-      console.log(query);
-
       const acquisitions = await ProductAcquisitionModel.find(query)
         .populate('productId')
         .populate('variantId')
         .sort({ acquisitionDate: -1 });
-
-      console.log(acquisitions);
 
       res.json(acquisitions);
     } catch (error) {

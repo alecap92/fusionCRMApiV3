@@ -9,8 +9,5 @@ export default async function httpRequest(nodo: any, context: any) {
   const headers = nodo.headers || {};
   const method = nodo.method || "POST";
 
-  console.log(`🌐 HTTP ${method} ➝ ${url}`);
-  console.log("Payload:", body);
-
   await axios({ method, url, headers, data: body });
 }

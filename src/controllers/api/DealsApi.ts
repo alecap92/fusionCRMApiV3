@@ -21,8 +21,6 @@ export const createDeal = async (req: Request, res: Response) => {
       return res.status(400).json({ message: "Faltan datos obligatorios" });
     }
 
-    console.log("Request Data:", req.body, pipeline, status, organizationId);
-
     let associatedContactId;
 
     // Buscar si ya existe un contacto con ese número de móvil en la organización
@@ -56,7 +54,6 @@ export const createDeal = async (req: Request, res: Response) => {
       });
 
       associatedContactId = newContact._id;
-      console.log("Nuevo contacto creado:", newContact);
     }
 
     // Crear el negocio (deal)

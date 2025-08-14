@@ -68,11 +68,6 @@ export async function generateContent(
       max_tokens: options.max_tokens,
     });
 
-    // Log token usage for monitoring
-    if (response.usage) {
-      console.log(`OpenAI tokens used: ${response.usage.total_tokens}`);
-    }
-
     return response.choices[0].message.content || "";
   } catch (error) {
     console.error("Error calling OpenAI API:", error);

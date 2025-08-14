@@ -88,7 +88,6 @@ export const importDeals = async (req: Request, res: Response) => {
           if (mappedKey === "ignore" || !mappedKey) continue;
 
           if (mappedKey === "status") {
-            console.log(mappedKey);
             const status = await Status.findOne(
               { name: value },
               organizationId

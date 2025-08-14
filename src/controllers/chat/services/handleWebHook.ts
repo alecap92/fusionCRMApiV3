@@ -10,33 +10,24 @@ import IntegrationsModel from "../../../models/IntegrationsModel";
 import ConversationModel from "../../../models/ConversationModel";
 import ConversationPipelineModel from "../../../models/ConversationPipelineModel";
 import { getSocketInstance } from "../../../config/socket";
-import axios from "axios";
 import UserModel from "../../../models/UserModel";
 import { reopenConversationIfClosed } from "../../../services/conversations/createConversation";
-import { AutomationHelper } from "../../../utils/automationHelper";
-import { sendCustomMessage } from "./sendCustomMessage";
 
 export const handleWebhook = async (
   req: Request,
   res: Response
 ): Promise<Response | void> => {
   try {
-    console.log("[WEBHOOK] Recibiendo nuevo webhook de WhatsApp");
-    console.log("[WEBHOOK] Body:", JSON.stringify(req.body, null, 2));
-
     const { entry } = req.body;
 
     if (!entry || !Array.isArray(entry)) {
-      console.log("[WEBHOOK] Webhook inválido: entry no es un array");
       return res.status(400).json({ error: "Invalid webhook format" });
     }
 
     for (const value of entry) {
-      console.log("[WEBHOOK] Procesando entrada del webhook");
       const changes = value.changes;
 
       if (!changes || !Array.isArray(changes)) {
-        console.log("[WEBHOOK] Webhook inválido: changes no es un array");
         continue;
       }
 
@@ -94,26 +85,8 @@ export const handleWebhook = async (
         });
 
         if (existingMessage) {
-          console.log(`[WEBHOOK] Mensaje duplicado detectado:
-            - MessageId: ${message.id}
-            - Organization: ${organization._id}
-            - Timestamp original: ${existingMessage.timestamp}
-          `);
           continue;
         }
-
-        console.log(`[WEBHOOK] Creando nuevo mensaje:
-          - From: ${from}
-          - To: ${to}
-          - Type: ${type}
-          - MessageId: ${message.id}
-        `);
-
-        // Log del mensaje entrante
-        const contactName = value.contacts?.[0]?.profile?.name || "Sin nombre";
-        console.log(
-          `[INCOMING] Mensaje de ${contactName} (${from}): ${message.text?.body || type}`
-        );
 
         let text = "";
         let awsUrl: string | null = null;
@@ -129,13 +102,6 @@ export const handleWebhook = async (
           ["image", "document", "audio", "video", "sticker"].includes(type)
         ) {
           const mediaObject = message[type];
-          console.log(
-            `[WEBHOOK] Media recibido tipo=${type}: ${JSON.stringify(
-              mediaObject || {},
-              null,
-              2
-            )}`
-          );
 
           // Preferir caption cuando exista
           const fallbackByType: Record<string, string> = {
@@ -147,15 +113,46 @@ export const handleWebhook = async (
           };
           text =
             mediaObject?.caption || fallbackByType[type] || "Archivo recibido";
-          console.log(
-            `[WEBHOOK] Caption detectado: "${mediaObject?.caption || "(sin caption)"}"`
-          );
 
           if (mediaObject?.id) {
             const mediaBuffer = await getMedia(mediaObject.id, accessToken);
+
+            // Determinar un nombre de archivo adecuado conservando la extensión
+            const inferExtensionFromMime = (mime?: string): string => {
+              if (!mime) return "";
+              const map: Record<string, string> = {
+                "application/pdf": "pdf",
+                "application/postscript": "ps",
+                "application/msword": "doc",
+                "application/vnd.openxmlformats-officedocument.wordprocessingml.document": "docx",
+                "application/vnd.ms-excel": "xls",
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": "xlsx",
+                "text/plain": "txt",
+                "text/csv": "csv",
+                "image/jpeg": "jpg",
+                "image/png": "png",
+                "image/gif": "gif",
+                "video/mp4": "mp4",
+                "audio/mpeg": "mp3",
+                "audio/ogg": "ogg",
+                "application/zip": "zip",
+              };
+              return map[mime] || (mime.split("/")[1] || "");
+            };
+
+            const ensureExtension = (name: string, mime?: string): string => {
+              const hasExt = /\.[A-Za-z0-9]{1,8}$/.test(name);
+              if (hasExt) return name;
+              const ext = inferExtensionFromMime(mime);
+              return ext ? `${name}.${ext}` : name;
+            };
+
+            const baseFilename: string = mediaObject.filename || mediaObject.id;
+            const finalFilename = ensureExtension(baseFilename, mediaObject.mime_type);
+
             awsUrl = await subirArchivo(
               mediaBuffer,
-              mediaObject.id,
+              finalFilename,
               mediaObject.mime_type
             );
           }
@@ -182,24 +179,10 @@ export const handleWebhook = async (
           "participants.contact.reference": from,
         });
 
-        /*
-        Una conversacion se crea doble si un chat que avanzo de etapa se vuelve a abrir? 
-        No, no deben haber dos conversacion, tocaria buscarlas y actualizar la conversacion para reabrirla.
-
-        Entonces:
-        1. Si no hay conversacion, crear una nueva
-        2. Si hay conversacion, actualizar la conversacion para reabrirla (como saber que currentStage es?)
-        3. Si hay conversacion, agregar el mensaje a la conversacion
-        */
-
         // Crear conversación si no existe
         if (!conversation) {
-          console.log(`[WEBHOOK] Creando nueva conversación:
-            - Título: ${contactName}
-            - SystemUserId: ${systemUserId}
-            - Contact Reference: ${from}
-          `);
-
+          const contactName = value.contacts?.[0]?.profile?.name || "Sin nombre";
+          
           conversation = await ConversationModel.create({
             title: contactName,
             organization: organization,
@@ -221,26 +204,9 @@ export const handleWebhook = async (
             firstContactTimestamp: new Date(),
             metadata: [],
           });
-
-          console.log(`[WEBHOOK] Conversación creada:
-            - ID: ${conversation._id}
-            - Título: ${conversation.title}
-            - AssignedTo: ${conversation.assignedTo}
-          `);
         } else {
           // Si la conversación existe, verificar si debe reabrirse
-          console.log(`[WEBHOOK] Conversación existente:
-            - ID: ${conversation._id}
-            - Título actual: ${conversation.title}
-            - AssignedTo actual: ${conversation.assignedTo}
-          `);
-
-          const wasReopened = await reopenConversationIfClosed(conversation);
-          if (wasReopened) {
-            console.log(
-              `[WEBHOOK] Conversación ${conversation._id} fue reabierta automáticamente`
-            );
-          }
+          await reopenConversationIfClosed(conversation);
         }
 
         // Crear mensaje
@@ -252,6 +218,8 @@ export const handleWebhook = async (
           message: text,
           mediaUrl: awsUrl,
           mediaId: message[type]?.id || "",
+          filename: (message[type] as any)?.filename || undefined,
+          mimeType: (message[type] as any)?.mime_type || undefined,
           timestamp: new Date(parseInt(timestamp) * 1000),
           type,
           direction: "incoming",
@@ -261,18 +229,12 @@ export const handleWebhook = async (
           conversation: conversation._id,
         });
 
-        console.log(
-          `[WEBHOOK] Mensaje creado exitosamente con ID: ${newMessage._id}`
-        );
-
         // Actualizar la conversación con el último mensaje
-        console.log("[WEBHOOK] Actualizando conversación");
         conversation.lastMessage = newMessage._id as any;
         conversation.lastMessageTimestamp = newMessage.timestamp;
         conversation.unreadCount = (conversation.unreadCount || 0) + 1;
         await conversation.save();
 
-        console.log("[WEBHOOK] Emitiendo eventos de socket");
         // Emitir evento de nuevo mensaje a través de socket
         const io = getSocketInstance();
 
@@ -289,10 +251,6 @@ export const handleWebhook = async (
           conversationId: conversation._id,
         });
 
-        console.log(
-          `[SOCKET] Mensaje enviado a conversación ${conversation._id} y organización ${organization._id}`
-        );
-
         // Obtener tokens de push del usuario asignado
         try {
           const assignedUserId = conversation.assignedTo;
@@ -308,6 +266,7 @@ export const handleWebhook = async (
 
           // Solo enviar si hay tokens válidos
           if (toTokens.length > 0) {
+            const contactName = value.contacts?.[0]?.profile?.name || "Sin nombre";
             await sendNotification(toTokens, {
               title: contactName,
               body: text,
@@ -316,11 +275,6 @@ export const handleWebhook = async (
                 type: "whatsapp_message",
               },
             } as any);
-            console.log(
-              "[PUSH] Notificación enviada a",
-              toTokens.length,
-              "dispositivos"
-            );
           }
         } catch (error) {
           console.error("[PUSH] Error enviando notificación:", error);
@@ -351,10 +305,6 @@ export const handleWebhook = async (
             from,
             text,
             isFirstMessage
-          );
-
-          console.log(
-            `[AUTOMATION] Procesado mensaje para conversación ${conversation._id}`
           );
         } catch (error) {
           console.error(`[AUTOMATION] Error:`, error);

@@ -26,9 +26,6 @@ export class AutomationHelper {
       });
 
       if (!canTrigger) {
-        console.log(
-          `Automatización '${automationType}' bloqueada para conversación ${conversationId}`
-        );
         return false;
       }
 
@@ -42,9 +39,6 @@ export class AutomationHelper {
         triggeredBy
       );
 
-      console.log(
-        `Automatización '${automationType}' ejecutada exitosamente para conversación ${conversationId}`
-      );
       return true;
     } catch (error) {
       console.error(

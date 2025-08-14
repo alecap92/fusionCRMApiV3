@@ -26,7 +26,6 @@ export const recalculateAllLeadScores = async (
     });
 
     if (activeRules.length === 0) {
-      console.log(`No hay reglas activas para la organización ${orgId}`);
       return;
     }
 
@@ -58,10 +57,6 @@ export const recalculateAllLeadScores = async (
       contact.leadScore = totalScore;
       await contact.save();
     }
-
-    console.log(
-      `Puntajes recalculados para ${contacts.length} contactos de la organización ${orgId}`
-    );
   } catch (error) {
     console.error("Error al recalcular puntajes de lead scoring:", error);
     throw error;
@@ -117,7 +112,6 @@ export const calculateContactScore = async (
     });
 
     if (activeRules.length === 0) {
-      console.log(`No hay reglas activas para la organización ${orgId}`);
       return 0;
     }
 
@@ -128,7 +122,6 @@ export const calculateContactScore = async (
     });
 
     if (!contact) {
-      console.log(`Contacto ${contId} no encontrado`);
       return 0;
     }
 
@@ -287,9 +280,6 @@ export const calculateContactsScores = async (
     if (contactsToUpdate.length > 0) {
       // Utilizamos Promise.all para actualizar todos los contactos en paralelo
       await Promise.all(contactsToUpdate.map((contact) => contact.save()));
-      console.log(
-        `Actualizados ${contactsToUpdate.length} contactos con nuevo leadScore`
-      );
     }
 
     return scores;

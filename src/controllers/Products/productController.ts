@@ -184,7 +184,6 @@ export const deleteProduct = async (req: Request, res: Response) => {
 
 export const searchProducts = async (req: Request, res: Response) => {
   try {
-    console.log("searchProducts");
     const userId = req.user?._id;
     const organizationId = req.user?.organizationId;
     const searchValue = req.query.term as string;
