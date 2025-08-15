@@ -360,6 +360,7 @@ export const sendCustomMessage = async (
           {
             lastMessage: outgoingMessage._id,
             lastMessageTimestamp: outgoingMessage.timestamp,
+            unreadCount: 0, // Resetear contador de no leídos cuando se envía un mensaje saliente
           },
           { new: true }
         );

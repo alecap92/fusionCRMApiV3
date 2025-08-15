@@ -216,6 +216,11 @@ export const sendTemplateMessage = async (req: Request, res: Response) => {
 
       await outGoingMessage.save();
 
+      // Resetear contador de no leídos cuando se envía un mensaje saliente
+      await ConversationModel.findByIdAndUpdate(conversationId, {
+        unreadCount: 0,
+      });
+
       return res.status(200).json({
         message: "Mensaje de plantilla enviado exitosamente",
         conversationId,

@@ -362,10 +362,13 @@ export const listenForNewEmails = async () => {
         await connectionManager.createConnectionForUser(userId.toString());
         validUsers++;
       } catch (error) {
-        console.error(
-          `❌ Error creando conexión para usuario ${userId}:`,
-          error
-        );
+        // Reducir ruido: log conciso con causa
+        const err: any = error;
+        console.error("IMAP auth/connection error", {
+          userId: userId.toString(),
+          message: err?.message || String(err),
+          code: err?.code,
+        });
         invalidUsers++;
       }
     }

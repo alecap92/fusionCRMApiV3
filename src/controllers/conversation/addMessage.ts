@@ -104,6 +104,9 @@ export const addMessage = async (
     // Si es un mensaje entrante, incrementar el contador de no leídos
     if (direction === "incoming") {
       conversation.unreadCount = (conversation.unreadCount || 0) + 1;
+    } else if (direction === "outgoing") {
+      // Si es un mensaje saliente, resetear el contador de no leídos
+      conversation.unreadCount = 0;
     }
 
     // Si falta displayInfo del contacto, intentar enriquecerlo mínimamente (solo mobile)
@@ -154,7 +157,9 @@ export const markConversationAsRead = async (
 ) => {
   try {
     const { conversationId } = req.params;
-    const organizationId = req.organization;
+    // Algunos middlewares adjuntan la organización como req.user.organizationId.
+    // Aseguramos compatibilidad tomando primero la de usuario y luego el fallback.
+    const organizationId = (req as any)?.user?.organizationId || (req as any)?.organization;
 
     // Verificar que la conversación existe
     const conversation = await Conversation.findOne({
