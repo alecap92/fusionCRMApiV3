@@ -1,6 +1,8 @@
 import { Request, Response } from "express";
+import axios from "axios";
 import Conversation from "../../models/ConversationModel";
 import Message from "../../models/MessageModel";
+import IntegrationsModel from "../../models/IntegrationsModel";
 import { Types } from "mongoose";
 import { reopenConversationIfClosed } from "../../services/conversations/createConversation";
 
@@ -25,18 +27,27 @@ export const addMessage = async (
       longitude,
       replyToMessage,
       messageId,
+      filename,
+      mimeType,
     } = req.body;
 
     // Validación y trazas mínimas
 
-    const organizationId = req.organization;
+    const organizationId = (req as any)?.user?.organizationId || (req as any)?.organization;
     const userId = req.user?._id;
 
     // Validaciones básicas
-    if (!from || !to || !message || !type || !direction) {
+    if (!to || !type || !direction) {
       return res.status(400).json({
         success: false,
-        message: "Se requieren los campos from, to, message, type y direction",
+        message: "Se requieren los campos to, type y direction",
+      });
+    }
+
+    if (!message && !mediaUrl) {
+      return res.status(400).json({
+        success: false,
+        message: "Se requiere 'message' o 'mediaUrl'",
       });
     }
 
@@ -73,16 +84,159 @@ export const addMessage = async (
       }
     }
 
+    // Si es un mensaje saliente, intentar enviarlo por la API de WhatsApp antes de guardar
+    let outgoingMessageId: string | undefined;
+    if (direction === "outgoing") {
+      // Buscar integración de WhatsApp
+      const integration = await IntegrationsModel.findOne({
+        organizationId: organizationId,
+        service: "whatsapp",
+      });
+
+      if (!integration) {
+        return res.status(400).json({
+          success: false,
+          message: "Integración de WhatsApp no encontrada",
+        });
+      }
+
+      const apiUrl = process.env.WHATSAPP_API_URL as string;
+      const phoneNumberId = integration.credentials?.numberIdIdentifier as string;
+      const accessToken = integration.credentials?.accessToken as string;
+
+      if (!apiUrl || !phoneNumberId || !accessToken) {
+        return res.status(400).json({
+          success: false,
+          message: "Credenciales de WhatsApp incompletas",
+        });
+      }
+
+      const whatsappApiUrl = `${apiUrl}/${phoneNumberId}/messages`;
+
+      // Construir payload según el tipo
+      let payload: any;
+      try {
+        switch (type) {
+          case "text":
+            if (!message) {
+              return res.status(400).json({
+                success: false,
+                message: "El campo 'message' es requerido para mensajes de texto",
+              });
+            }
+            payload = {
+              messaging_product: "whatsapp",
+              to,
+              text: { body: message },
+            };
+            break;
+          case "image":
+            if (!mediaUrl) {
+              return res.status(400).json({
+                success: false,
+                message: "'mediaUrl' es requerido para mensajes de imagen",
+              });
+            }
+            payload = {
+              messaging_product: "whatsapp",
+              to,
+              type: "image",
+              image: {
+                link: mediaUrl,
+                ...(message ? { caption: message } : {}),
+              },
+            };
+            break;
+          case "document":
+            if (!mediaUrl) {
+              return res.status(400).json({
+                success: false,
+                message: "'mediaUrl' es requerido para mensajes de documento",
+              });
+            }
+            payload = {
+              messaging_product: "whatsapp",
+              to,
+              type: "document",
+              document: {
+                link: mediaUrl,
+                ...(message ? { caption: message } : {}),
+                ...(filename ? { filename } : {}),
+              },
+            };
+            break;
+          case "video":
+            if (!mediaUrl) {
+              return res.status(400).json({
+                success: false,
+                message: "'mediaUrl' es requerido para mensajes de video",
+              });
+            }
+            payload = {
+              messaging_product: "whatsapp",
+              to,
+              type: "video",
+              video: {
+                link: mediaUrl,
+                ...(message ? { caption: message } : {}),
+              },
+            };
+            break;
+          case "audio":
+            if (!mediaUrl) {
+              return res.status(400).json({
+                success: false,
+                message: "'mediaUrl' es requerido para mensajes de audio",
+              });
+            }
+            payload = {
+              messaging_product: "whatsapp",
+              to,
+              type: "audio",
+              audio: {
+                link: mediaUrl,
+              },
+            };
+            break;
+          default:
+            return res.status(400).json({
+              success: false,
+              message: "Tipo de mensaje no soportado",
+            });
+        }
+
+        const response = await axios.post(whatsappApiUrl, payload, {
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${accessToken}`,
+          },
+        });
+
+        outgoingMessageId = response.data?.messages?.[0]?.id;
+      } catch (sendError: any) {
+        const status = sendError?.response?.status || 500;
+        const details = sendError?.response?.data || { message: sendError?.message };
+        return res.status(status).json({
+          success: false,
+          message: "Error al enviar mensaje a WhatsApp",
+          details,
+        });
+      }
+    }
+
     // Crear el nuevo mensaje
     // Creando nuevo mensaje en la base de datos
+    const effectiveFrom = from || (direction === "outgoing" ? "system" : to);
     const newMessage = new Message({
       user: userId,
       organization: organizationId,
-      from,
+      from: effectiveFrom,
       to,
       message,
       mediaUrl,
       mediaId,
+      filename,
+      mimeType,
       latitude,
       longitude,
       timestamp: new Date(),
@@ -90,7 +244,7 @@ export const addMessage = async (
       direction,
       isRead: direction === "outgoing", // Los mensajes salientes se marcan como leídos automáticamente
       replyToMessage,
-      messageId,
+      messageId: messageId || outgoingMessageId,
       conversation: conversationId,
     });
 
