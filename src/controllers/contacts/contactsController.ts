@@ -67,11 +67,37 @@ export const getContacts = async (req: Request, res: Response) => {
       .skip((page - 1) * limit + offset)
       .limit(limit)
       .sort({ createdAt: -1 })
+      .lean()
       .exec();
 
     const total = await Contact.countDocuments({ organizationId });
+
+    // Calcular totalRevenue por contacto
+    const contactIds = contacts.map((c: any) => c._id);
+    let revenueByContact: Record<string, number> = {};
+    if (contactIds.length > 0) {
+      const revenueAgg = await DealsModel.aggregate([
+        { $match: { associatedContactId: { $in: contactIds } } },
+        {
+          $group: {
+            _id: "$associatedContactId",
+            totalRevenue: { $sum: { $ifNull: ["$amount", 0] } },
+          },
+        },
+      ]).exec();
+      revenueByContact = revenueAgg.reduce((acc: Record<string, number>, cur: any) => {
+        acc[String(cur._id)] = cur.totalRevenue || 0;
+        return acc;
+      }, {});
+    }
+
+    const contactsWithRevenue = contacts.map((c: any) => ({
+      ...c,
+      totalRevenue: revenueByContact[String(c._id)] || 0,
+    }));
+
     res.status(200).json({
-      data: contacts,
+      data: contactsWithRevenue,
       total,
     });
   } catch (error) {
@@ -199,9 +225,34 @@ export const searchContact = async (req: Request, res: Response) => {
     })
       .limit(limitNumber)
       .skip((pageNumber - 1) * limitNumber)
+      .lean()
       .exec();
 
-    res.status(200).json(contacts);
+    // Calcular totalRevenue por contacto en resultados de búsqueda
+    const contactIds = contacts.map((c: any) => c._id);
+    let revenueByContact: Record<string, number> = {};
+    if (contactIds.length > 0) {
+      const revenueAgg = await DealsModel.aggregate([
+        { $match: { associatedContactId: { $in: contactIds } } },
+        {
+          $group: {
+            _id: "$associatedContactId",
+            totalRevenue: { $sum: { $ifNull: ["$amount", 0] } },
+          },
+        },
+      ]).exec();
+      revenueByContact = revenueAgg.reduce((acc: Record<string, number>, cur: any) => {
+        acc[String(cur._id)] = cur.totalRevenue || 0;
+        return acc;
+      }, {});
+    }
+
+    const contactsWithRevenue = contacts.map((c: any) => ({
+      ...c,
+      totalRevenue: revenueByContact[String(c._id)] || 0,
+    }));
+
+    res.status(200).json(contactsWithRevenue);
   } catch (error) {
     console.error("Error buscando contactos:", error);
     res.status(500).json({ message: "Error en el servidor" });
@@ -262,12 +313,37 @@ export const filterContacts = async (req: Request, res: Response) => {
       .skip((page - 1) * limit)
       .limit(limit)
       .sort({ createdAt: -1 })
+      .lean()
       .exec();
 
     const total = await Contact.countDocuments(query);
 
+    // Calcular totalRevenue para resultados filtrados
+    const contactIds = contacts.map((c: any) => c._id);
+    let revenueByContact: Record<string, number> = {};
+    if (contactIds.length > 0) {
+      const revenueAgg = await DealsModel.aggregate([
+        { $match: { associatedContactId: { $in: contactIds } } },
+        {
+          $group: {
+            _id: "$associatedContactId",
+            totalRevenue: { $sum: { $ifNull: ["$amount", 0] } },
+          },
+        },
+      ]).exec();
+      revenueByContact = revenueAgg.reduce((acc: Record<string, number>, cur: any) => {
+        acc[String(cur._id)] = cur.totalRevenue || 0;
+        return acc;
+      }, {});
+    }
+
+    const contactsWithRevenue = contacts.map((c: any) => ({
+      ...c,
+      totalRevenue: revenueByContact[String(c._id)] || 0,
+    }));
+
     res.status(200).json({
-      data: contacts,
+      data: contactsWithRevenue,
       total,
       page,
       limit,
