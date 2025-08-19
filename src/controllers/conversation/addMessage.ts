@@ -127,6 +127,7 @@ export const addMessage = async (
 
     // Si es un mensaje saliente, intentar enviarlo por la API de WhatsApp antes de guardar
     let outgoingMessageId: string | undefined;
+    let senderPhoneNumber: string | undefined;
     if (direction === "outgoing") {
       // Buscar integración de WhatsApp
       logger.info("[ADD_MESSAGE] Mensaje saliente: consultando integración de WhatsApp", {
@@ -150,6 +151,7 @@ export const addMessage = async (
       const apiUrl = process.env.WHATSAPP_API_URL as string;
       const phoneNumberId = integration.credentials?.numberIdIdentifier as string;
       const accessToken = integration.credentials?.accessToken as string;
+      senderPhoneNumber = (integration.credentials as any)?.phoneNumber || undefined;
 
       if (!apiUrl || !phoneNumberId || !accessToken) {
         logger.warn("[ADD_MESSAGE] Credenciales de WhatsApp incompletas", {
@@ -292,7 +294,12 @@ export const addMessage = async (
 
     // Crear el nuevo mensaje
     // Creando nuevo mensaje en la base de datos
-    const effectiveFrom = from || (direction === "outgoing" ? "system" : to);
+    const effectiveFrom = from || senderPhoneNumber || (direction === "outgoing" ? "system" : to);
+    logger.info("[ADD_MESSAGE] Determinación del remitente (from)", {
+      providedFrom: from || null,
+      senderPhoneNumber: senderPhoneNumber || null,
+      effectiveFrom,
+    });
     const newMessage = new Message({
       user: userId,
       organization: organizationId,
