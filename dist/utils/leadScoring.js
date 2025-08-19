@@ -68,7 +68,6 @@ const recalculateAllLeadScores = (organizationId) => __awaiter(void 0, void 0, v
             isActive: true,
         });
         if (activeRules.length === 0) {
-            console.log(`No hay reglas activas para la organización ${orgId}`);
             return;
         }
         // Obtener todos los contactos de la organización
@@ -91,7 +90,6 @@ const recalculateAllLeadScores = (organizationId) => __awaiter(void 0, void 0, v
             contact.leadScore = totalScore;
             yield contact.save();
         }
-        console.log(`Puntajes recalculados para ${contacts.length} contactos de la organización ${orgId}`);
     }
     catch (error) {
         console.error("Error al recalcular puntajes de lead scoring:", error);
@@ -136,7 +134,6 @@ const calculateContactScore = (contactId, organizationId) => __awaiter(void 0, v
             isActive: true,
         });
         if (activeRules.length === 0) {
-            console.log(`No hay reglas activas para la organización ${orgId}`);
             return 0;
         }
         // Obtener el contacto específico
@@ -145,7 +142,6 @@ const calculateContactScore = (contactId, organizationId) => __awaiter(void 0, v
             organizationId: orgId,
         });
         if (!contact) {
-            console.log(`Contacto ${contId} no encontrado`);
             return 0;
         }
         // Obtener todos los deals del contacto si es necesario
@@ -267,7 +263,6 @@ const calculateContactsScores = (organizationId, contactIds) => __awaiter(void 0
         if (contactsToUpdate.length > 0) {
             // Utilizamos Promise.all para actualizar todos los contactos en paralelo
             yield Promise.all(contactsToUpdate.map((contact) => contact.save()));
-            console.log(`Actualizados ${contactsToUpdate.length} contactos con nuevo leadScore`);
         }
         return scores;
     }

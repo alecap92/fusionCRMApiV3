@@ -221,6 +221,10 @@ const sendTemplateMessage = (req, res) => __awaiter(void 0, void 0, void 0, func
                 messageId: (_m = (_l = (_k = response.data) === null || _k === void 0 ? void 0 : _k.messages) === null || _l === void 0 ? void 0 : _l[0]) === null || _m === void 0 ? void 0 : _m.id,
             });
             yield outGoingMessage.save();
+            // Resetear contador de no leídos cuando se envía un mensaje saliente
+            yield ConversationModel_1.default.findByIdAndUpdate(conversationId, {
+                unreadCount: 0,
+            });
             return res.status(200).json({
                 message: "Mensaje de plantilla enviado exitosamente",
                 conversationId,

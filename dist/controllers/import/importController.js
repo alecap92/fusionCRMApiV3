@@ -17,7 +17,6 @@ const xlsx_1 = __importDefault(require("xlsx"));
 const ContactModel_1 = __importDefault(require("../../models/ContactModel"));
 const importContacts = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     var _a, _b;
-    console.log(req.user);
     const userId = (_a = req.user) === null || _a === void 0 ? void 0 : _a._id;
     const organizationId = (_b = req.user) === null || _b === void 0 ? void 0 : _b.organizationId;
     const mapping = req.body.mapping ? JSON.parse(req.body.mapping) : null;

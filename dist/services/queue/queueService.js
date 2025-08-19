@@ -36,7 +36,7 @@ class QueueService {
             console.error("Redis connection error:", err);
         });
         connection.on("connect", () => {
-            console.log("Successfully connected to Redis");
+            // Conexión exitosa a Redis
         });
         // Crear worker para procesar los trabajos
         this.delayWorker = new bullmq_1.Worker("automation-delays", (job) => __awaiter(this, void 0, void 0, function* () {
@@ -46,7 +46,6 @@ class QueueService {
         this.queueEvents = new bullmq_1.QueueEvents("automation-delays", queueConnectionOptions);
         // Configurar manejadores de eventos
         this.setupEventHandlers();
-        console.log("📋 Servicio de colas para automatizaciones inicializado");
     }
     /**
      * Obtener la instancia del servicio (Singleton)
@@ -78,7 +77,6 @@ class QueueService {
                         delay: 5000, // 5 segundos entre reintentos, aumentando exponencialmente
                     },
                 });
-                console.log(`📝 Ejecución retrasada añadida a la cola: ${job.id} (${delayMinutes} minutos)`);
                 return job.id;
             }
             catch (error) {
@@ -92,7 +90,6 @@ class QueueService {
      */
     processDelayedExecution(job) {
         return __awaiter(this, void 0, void 0, function* () {
-            console.log(`⏱️ Procesando ejecución retrasada: ${job.id}`);
             const { executionId, automationId, context, nextNodes, allNodes } = job.data;
             // Registrar la finalización del delay en el contexto (por si se necesita auditar)
             context.logs.push({
@@ -106,7 +103,6 @@ class QueueService {
                 // Verificar si tenemos todos los nodos. Si no, cargarlos desde la base de datos
                 let nodesForExecution = allNodes;
                 if (!nodesForExecution || nodesForExecution.length === 0) {
-                    console.log("No se recibieron nodos en el job, cargando desde la base de datos...");
                     try {
                         const AutomationModel = require("../../models/AutomationModel").default;
                         const automation = yield AutomationModel.findById(automationId);
@@ -114,7 +110,6 @@ class QueueService {
                             throw new Error(`Automatización no encontrada: ${automationId}`);
                         }
                         nodesForExecution = automation.nodes;
-                        console.log(`Cargados ${nodesForExecution.length} nodos desde la base de datos`);
                     }
                     catch (loadError) {
                         console.error("Error cargando nodos desde la base de datos:", loadError);
@@ -131,13 +126,11 @@ class QueueService {
                         //   nodesForExecution,
                         //   context
                         // );
-                        console.log(`TODO: Ejecutar nodo ${nextNodeId} después de delay`);
                     }
                     else {
                         console.error(`❌ Nodo siguiente no encontrado: ${nextNodeId}`);
                     }
                 }
-                console.log(`✅ Ejecución retrasada completada: ${job.id}`);
             }
             catch (error) {
                 console.error(`❌ Error procesando ejecución retrasada ${job.id}:`, error);
@@ -151,7 +144,7 @@ class QueueService {
     setupEventHandlers() {
         // Eventos de la cola
         this.queueEvents.on("completed", ({ jobId }) => {
-            console.log(`✅ Trabajo completado: ${jobId}`);
+            // Trabajo completado exitosamente
         });
         this.queueEvents.on("failed", ({ jobId, failedReason }) => {
             console.error(`❌ Trabajo fallido: ${jobId}`, failedReason);
@@ -169,7 +162,6 @@ class QueueService {
             yield this.delayWorker.close();
             yield this.delayQueue.close();
             yield this.queueEvents.close();
-            console.log("📋 Servicio de colas cerrado correctamente");
         });
     }
 }

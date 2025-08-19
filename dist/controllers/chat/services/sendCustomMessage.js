@@ -1,4 +1,37 @@
 "use strict";
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
 var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
     function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
     return new (P || (P = Promise))(function (resolve, reject) {
@@ -24,14 +57,10 @@ const createConversation_1 = require("../../../services/conversations/createConv
 const ConversationPipelineModel_1 = __importDefault(require("../../../models/ConversationPipelineModel"));
 const apiUrl = process.env.WHATSAPP_API_URL;
 const sendCustomMessage = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    var _a;
+    var _a, _b, _c;
     try {
         const { message, to, type: messageType, mediaUrl, file, caption } = req.body;
-        console.log(`[SEND_CUSTOM] Datos recibidos:
-      - To: ${to}
-      - Type: ${messageType}
-      - MediaUrl: ${mediaUrl || "N/A"}
-    `);
+        // Datos básicos para depuración
         if (!to || !messageType || (messageType === "text" && !message)) {
             console.error("[SEND_CUSTOM] Faltan parámetros requeridos");
             return res.status(400).json({ error: "Missing required parameters" });
@@ -118,14 +147,49 @@ const sendCustomMessage = (req, res) => __awaiter(void 0, void 0, void 0, functi
                         });
                     }
                 }
+                // Aceptar metadatos del cliente cuando no se sube el archivo aquí
+                const clientFilename = req.body.filename || undefined;
+                const clientMimeType = req.body.mimeType || undefined;
+                // Si el archivo viene subido en el cuerpo, preferimos mantener su nombre
+                let documentLink = mediaUrl || "";
+                let finalFilename = clientFilename;
+                let finalMimeType = clientMimeType;
+                if (file) {
+                    // Subir a S3 usando el nombre original
+                    const { subirArchivo } = yield Promise.resolve().then(() => __importStar(require("../../../config/aws")));
+                    documentLink = yield subirArchivo(file.buffer, file.originalname || file.filename || "document", file.mimetype || "application/octet-stream");
+                    finalFilename = file.originalname || file.filename;
+                    finalMimeType = file.mimetype;
+                }
+                // Si no hay filename aún, intentar deducirlo desde la URL
+                if (!finalFilename && documentLink) {
+                    try {
+                        const pathPart = decodeURIComponent(new URL(documentLink).pathname);
+                        const last = pathPart.split("/").pop() || "";
+                        finalFilename = last || undefined;
+                    }
+                    catch (_d) { }
+                }
+                // Si no hay mimeType, deducir por extensión básica
+                if (!finalMimeType && finalFilename) {
+                    const ext = (finalFilename.split(".").pop() || "").toLowerCase();
+                    const map = {
+                        pdf: "application/pdf",
+                        ps: "application/postscript",
+                        doc: "application/msword",
+                        docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                        xls: "application/vnd.ms-excel",
+                        xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                        txt: "text/plain",
+                        csv: "text/csv",
+                    };
+                    finalMimeType = map[ext];
+                }
                 payload = {
                     messaging_product: "whatsapp",
                     to,
                     type: "document",
-                    document: {
-                        link: mediaUrl || "", // Usar mediaUrl si existe, sino ""
-                        caption: caption || "",
-                    },
+                    document: Object.assign({ link: documentLink, caption: caption || "" }, (finalFilename ? { filename: finalFilename } : {})),
                     message: "documento",
                 };
                 break;
@@ -240,7 +304,7 @@ const sendCustomMessage = (req, res) => __awaiter(void 0, void 0, void 0, functi
             conversation = newConversation;
         }
         if (response.status === 200 || response.status === 201) {
-            console.log("[SEND_CUSTOM] Mensaje enviado exitosamente a WhatsApp API");
+            // Enviado a WhatsApp API
             // Verificar si ya existe un mensaje con este ID
             if (messageId) {
                 const existingMessage = yield MessageModel_1.default.findOne({
@@ -248,11 +312,11 @@ const sendCustomMessage = (req, res) => __awaiter(void 0, void 0, void 0, functi
                     organization: organization._id,
                 });
                 if (existingMessage) {
-                    console.log(`[SEND_CUSTOM] Mensaje duplicado detectado, messageId: ${messageId}`);
+                    // Duplicado detectado
                     return res.status(409).json({ error: "Mensaje duplicado" });
                 }
             }
-            console.log("[SEND_CUSTOM] Guardando mensaje en la base de datos");
+            // Guardando mensaje
             // Crear y almacenar el mensaje usando el nuevo MessageModel
             const outgoingMessage = yield MessageModel_1.default.create({
                 user: user._id,
@@ -263,12 +327,13 @@ const sendCustomMessage = (req, res) => __awaiter(void 0, void 0, void 0, functi
                 direction: "outgoing",
                 type: messageType,
                 mediaUrl: mediaUrl || "",
+                filename: (_b = payload === null || payload === void 0 ? void 0 : payload.document) === null || _b === void 0 ? void 0 : _b.filename,
+                mimeType: req.body.mimeType || ((_c = payload === null || payload === void 0 ? void 0 : payload.document) === null || _c === void 0 ? void 0 : _c.mime_type),
                 timestamp: new Date().toISOString(),
                 messageId: messageId,
                 conversation: conversation === null || conversation === void 0 ? void 0 : conversation._id,
             });
-            console.log(`[SEND_CUSTOM] Mensaje guardado exitosamente con ID: ${outgoingMessage._id}`);
-            console.log("[SEND_CUSTOM] Emitiendo evento de socket");
+            // Emitiendo evento de socket
             const io = (0, socket_1.getSocketInstance)();
             io.emit("newMessage", Object.assign(Object.assign({}, outgoingMessage.toObject()), { direction: "outgoing" }));
             // Actualizar la conversación con el último mensaje saliente
@@ -276,6 +341,7 @@ const sendCustomMessage = (req, res) => __awaiter(void 0, void 0, void 0, functi
                 yield ConversationModel_1.default.findByIdAndUpdate(conversation._id, {
                     lastMessage: outgoingMessage._id,
                     lastMessageTimestamp: outgoingMessage.timestamp,
+                    unreadCount: 0, // Resetear contador de no leídos cuando se envía un mensaje saliente
                 }, { new: true });
             }
             catch (updateErr) {

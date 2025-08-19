@@ -13,7 +13,6 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.deleteMediaFromCloudinary = void 0;
 const cloudinary_1 = require("cloudinary");
 const deleteMediaFromCloudinary = (mediaIds) => __awaiter(void 0, void 0, void 0, function* () {
-    console.log(mediaIds, "mediaIds");
     try {
         yield Promise.all(mediaIds.map((mediaId) => __awaiter(void 0, void 0, void 0, function* () {
             yield cloudinary_1.v2.uploader.destroy(mediaId);

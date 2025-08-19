@@ -63,10 +63,6 @@ function generateContent(messages_1, organizationId_1) {
                 temperature: (_a = options.temperature) !== null && _a !== void 0 ? _a : 0.7,
                 max_tokens: options.max_tokens,
             });
-            // Log token usage for monitoring
-            if (response.usage) {
-                console.log(`OpenAI tokens used: ${response.usage.total_tokens}`);
-            }
             return response.choices[0].message.content || "";
         }
         catch (error) {

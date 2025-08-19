@@ -102,7 +102,6 @@ exports.deleteCampana = deleteCampana;
 const createCampana = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     var _a, _b;
     const campana = req.body;
-    console.log(campana);
     const organizationId = (_a = req.user) === null || _a === void 0 ? void 0 : _a.organizationId;
     const userId = (_b = req.user) === null || _b === void 0 ? void 0 : _b._id;
     if (!organizationId) {
@@ -114,7 +113,6 @@ const createCampana = (req, res) => __awaiter(void 0, void 0, void 0, function* 
         res.status(201).json(newCampana);
     }
     catch (error) {
-        console.log(error);
         handleError(res, error);
     }
 });

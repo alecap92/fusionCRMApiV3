@@ -81,7 +81,6 @@ class IMAPConnectionManager {
             }
             try {
                 manager.reconnectAttempts++;
-                console.log(`Attempting reconnection ${manager.reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS} for user ${userId}`);
                 // Cerrar conexión existente si existe
                 if (manager.connection) {
                     try {
@@ -303,28 +302,30 @@ const listenForNewEmails = () => __awaiter(void 0, void 0, void 0, function* () 
         const users = yield UserModel_1.default.find({
             "emailSettings.imapSettings": { $exists: true },
         }).select("emailSettings");
-        console.log(`📧 Evaluando ${users.length} usuarios para conexiones IMAP...`);
         let validUsers = 0;
         let invalidUsers = 0;
         for (const user of users) {
             const { _id: userId } = user;
             // Validar que las configuraciones estén completas
             if (!isEmailConfigurationComplete(user.emailSettings)) {
-                console.log(`⚠️ Usuario ${userId} tiene configuraciones incompletas, omitiendo...`);
                 invalidUsers++;
                 continue;
             }
             if (activeConnections.has(userId.toString())) {
-                console.log(`🔄 Conexión ya existe para usuario: ${userId}`);
                 continue;
             }
             try {
                 yield connectionManager.createConnectionForUser(userId.toString());
                 validUsers++;
-                console.log(`✅ Conexión IMAP establecida para usuario: ${userId}`);
             }
             catch (error) {
-                console.error(`❌ Error creando conexión para usuario ${userId}:`, error);
+                // Reducir ruido: log conciso con causa
+                const err = error;
+                console.error("IMAP auth/connection error", {
+                    userId: userId.toString(),
+                    message: (err === null || err === void 0 ? void 0 : err.message) || String(err),
+                    code: err === null || err === void 0 ? void 0 : err.code,
+                });
                 invalidUsers++;
             }
         }

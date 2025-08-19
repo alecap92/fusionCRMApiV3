@@ -315,7 +315,6 @@ const executeAutomation = (req, res) => __awaiter(void 0, void 0, void 0, functi
         else {
             // Para automatizaciones visuales/workflow, usar el servicio de ejecución existente
             // TODO: Implementar ejecución para automatizaciones de workflow
-            console.log("Ejecución de automatizaciones de workflow no implementada aún");
         }
         // Actualizar estadísticas
         automation.stats = automation.stats || {

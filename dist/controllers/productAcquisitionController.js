@@ -69,12 +69,10 @@ exports.productAcquisitionController = {
                 if (status) {
                     query.status = status;
                 }
-                console.log(query);
                 const acquisitions = yield ProductAcquisitionModel_1.default.find(query)
                     .populate('productId')
                     .populate('variantId')
                     .sort({ acquisitionDate: -1 });
-                console.log(acquisitions);
                 res.json(acquisitions);
             }
             catch (error) {

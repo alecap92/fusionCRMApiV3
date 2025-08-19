@@ -27,8 +27,12 @@ const s3 = new client_s3_1.S3Client({
         secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY || "",
     },
 });
-// Función para limpiar nombres de archivo
+// Función para limpiar nombres de archivo conservando la extensión
 const limpiarNombreArchivo = (nombre) => {
+    const parts = nombre.split(".");
+    const hasExt = parts.length > 1;
+    const ext = hasExt ? parts.pop() : "";
+    const base = parts.join(".");
     return nombre
         .normalize("NFD")
         .replace(/[\u0300-\u036f]/g, "")
@@ -61,7 +65,6 @@ const subirArchivo = (mediaBuffer, nombre, type) => __awaiter(void 0, void 0, vo
     try {
         // Si el archivo es de tipo audio/ogg, conviértelo
         if (type.includes("audio/ogg")) {
-            console.log("Convirtiendo archivo OGG a MP3...");
             mediaBuffer = yield convertirAudio(mediaBuffer);
             nombre = `${limpiarNombreArchivo(nombre)}.mp3`; // Concatena la extensión
             type = "audio/mpeg"; // Actualiza el Content-Type
@@ -80,7 +83,6 @@ const subirArchivo = (mediaBuffer, nombre, type) => __awaiter(void 0, void 0, vo
         const command = new client_s3_1.PutObjectCommand(params);
         yield s3.send(command);
         const url = `https://${params.Bucket}.s3.amazonaws.com/${params.Key}`;
-        console.log("Archivo subido:", url);
         return url; // Devuelve la URL del archivo subido
     }
     catch (error) {

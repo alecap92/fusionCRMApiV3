@@ -21,8 +21,6 @@ function httpRequest(nodo, context) {
         const body = JSON.parse(handlebars_1.default.compile(JSON.stringify(nodo.body || {}))(context));
         const headers = nodo.headers || {};
         const method = nodo.method || "POST";
-        console.log(`🌐 HTTP ${method} ➝ ${url}`);
-        console.log("Payload:", body);
         yield (0, axios_1.default)({ method, url, headers, data: body });
     });
 }

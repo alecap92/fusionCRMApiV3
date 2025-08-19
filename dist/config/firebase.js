@@ -26,16 +26,12 @@ if (missingFields.length > 0) {
     console.error("❌ Firebase Admin: Faltan variables de entorno:", missingFields);
     console.error("🔧 Asegúrate de configurar estas variables en el .env del backend");
 }
-else {
-    console.log("✅ Firebase Admin: Configuración completa");
-}
 // Inicializar Firebase Admin solo si no está ya inicializado
 if (!firebase_admin_1.default.apps.length) {
     try {
         firebase_admin_1.default.initializeApp({
             credential: firebase_admin_1.default.credential.cert(firebaseConfig),
         });
-        console.log("✅ Firebase Admin inicializado correctamente");
     }
     catch (error) {
         console.error("❌ Error inicializando Firebase Admin:", error);

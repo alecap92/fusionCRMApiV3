@@ -14,7 +14,7 @@ const connectToInbox = (config, callback) => {
         console.error("IMAP error:", err);
     });
     imap.once("end", () => {
-        console.log("Connection ended");
+        // Connection ended
     });
     imap.connect();
     return imap;

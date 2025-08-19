@@ -56,10 +56,8 @@ const getConversations = (req, res) => __awaiter(void 0, void 0, void 0, functio
             .select("title participants lastMessageTimestamp pipeline currentStage assignedTo isResolved tags unreadCount")
             .populate("assignedTo", "name email firstName lastName")
             .lean();
-        console.log(`[GET_CONVERSATIONS] Obtenidas ${conversations.length} conversaciones`);
         // Si no hay conversaciones, responder inmediatamente
         if (!conversations.length) {
-            console.log("[GET_CONVERSATIONS] No se encontraron conversaciones");
             return res.status(200).json({
                 success: true,
                 data: [],
@@ -72,13 +70,11 @@ const getConversations = (req, res) => __awaiter(void 0, void 0, void 0, functio
             });
         }
         /* ---------- Contactos en lote ---------- */
-        console.log("[GET_CONVERSATIONS] Buscando información de contactos");
         const references = [
             ...new Set(conversations
                 .map((c) => { var _a, _b; return (_b = (_a = c === null || c === void 0 ? void 0 : c.participants) === null || _a === void 0 ? void 0 : _a.contact) === null || _b === void 0 ? void 0 : _b.reference; })
                 .filter(Boolean)),
         ];
-        console.log(`[GET_CONVERSATIONS] Referencias de contacto encontradas: ${references.length}`);
         const contactsRaw = yield ContactModel_1.default.find({
             organizationId,
             $or: [
@@ -94,7 +90,6 @@ const getConversations = (req, res) => __awaiter(void 0, void 0, void 0, functio
         })
             .select("properties")
             .lean();
-        console.log(`[GET_CONVERSATIONS] Contactos encontrados: ${contactsRaw.length}`);
         const contactsByPhone = {};
         for (const contact of contactsRaw) {
             if (!(contact === null || contact === void 0 ? void 0 : contact.properties))
@@ -123,18 +118,10 @@ const getConversations = (req, res) => __awaiter(void 0, void 0, void 0, functio
             lastMessagesByConversation[lm._id.toString()] = lm.doc;
         }
         /* ---------- Construir respuesta ---------- */
-        console.log("[GET_CONVERSATIONS] Procesando conversaciones");
         const processedConversations = conversations.map((conversation) => {
             var _a, _b;
             const reference = (_b = (_a = conversation === null || conversation === void 0 ? void 0 : conversation.participants) === null || _a === void 0 ? void 0 : _a.contact) === null || _b === void 0 ? void 0 : _b.reference;
             const contact = reference ? contactsByPhone[reference] : null;
-            console.log(`[GET_CONVERSATIONS] Procesando conversación:
-        - ID2: ${conversation._id}
-        - Título: ${conversation.title}
-        - AssignedTo: ${JSON.stringify(conversation.assignedTo)}
-        - Reference: ${reference}
-        - Contact Found: ${!!contact}
-      `);
             // Display info de contacto
             if (reference) {
                 const findProp = (key) => { var _a, _b; return (_b = (_a = contact === null || contact === void 0 ? void 0 : contact.properties) === null || _a === void 0 ? void 0 : _a.find((p) => p.key === key)) === null || _b === void 0 ? void 0 : _b.value; };
@@ -146,11 +133,6 @@ const getConversations = (req, res) => __awaiter(void 0, void 0, void 0, functio
                     position: findProp("position") || "",
                     contactId: (contact === null || contact === void 0 ? void 0 : contact._id) || null,
                 };
-                console.log(`[GET_CONVERSATIONS] Display Info generada:
-          - Name: ${conversation.participants.contact.displayInfo.name}
-          - LastName: ${conversation.participants.contact.displayInfo.lastName}
-          - Mobile: ${conversation.participants.contact.displayInfo.mobile}
-        `);
             }
             // Añadir mobile helper y último mensaje
             conversation.mobile = reference;
@@ -160,7 +142,6 @@ const getConversations = (req, res) => __awaiter(void 0, void 0, void 0, functio
                 (lm === null || lm === void 0 ? void 0 : lm.timestamp) || conversation.lastMessageTimestamp;
             return conversation;
         });
-        console.log("[GET_CONVERSATIONS] Todas las conversaciones procesadas");
         const total = yield ConversationModel_1.default.countDocuments(queryConditions);
         return res.status(200).json({
             success: true,

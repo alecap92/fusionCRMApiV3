@@ -32,14 +32,12 @@ class AutomationHelper {
                     automationType,
                 });
                 if (!canTrigger) {
-                    console.log(`Automatización '${automationType}' bloqueada para conversación ${conversationId}`);
                     return false;
                 }
                 // Ejecutar la automatización
                 yield automationFunction();
                 // Registrar que la automatización fue ejecutada
                 yield automationService_1.AutomationService.recordAutomationTriggered(conversationId, automationType, triggeredBy);
-                console.log(`Automatización '${automationType}' ejecutada exitosamente para conversación ${conversationId}`);
                 return true;
             }
             catch (error) {

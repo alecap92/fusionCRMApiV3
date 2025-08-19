@@ -16,10 +16,6 @@ function sendEmail(nodo, context) {
         const to = (0, renderText_1.renderText)(nodo.to, context);
         const subject = (0, renderText_1.renderText)(nodo.subject, context);
         const body = (0, renderText_1.renderText)(nodo.emailBody, context);
-        console.log("📧 Enviando email:");
-        console.log("Para:", to);
-        console.log("Asunto:", subject);
-        console.log("Mensaje:", body);
         // Aquí conectas con tu servicio de correo real si lo deseas
     });
 }

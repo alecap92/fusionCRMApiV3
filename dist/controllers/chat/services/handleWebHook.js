@@ -60,20 +60,15 @@ const socket_1 = require("../../../config/socket");
 const UserModel_1 = __importDefault(require("../../../models/UserModel"));
 const createConversation_1 = require("../../../services/conversations/createConversation");
 const handleWebhook = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k;
+    var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l, _m, _o, _p;
     try {
-        console.log("[WEBHOOK] Recibiendo nuevo webhook de WhatsApp");
-        console.log("[WEBHOOK] Body:", JSON.stringify(req.body, null, 2));
         const { entry } = req.body;
         if (!entry || !Array.isArray(entry)) {
-            console.log("[WEBHOOK] Webhook inválido: entry no es un array");
             return res.status(400).json({ error: "Invalid webhook format" });
         }
         for (const value of entry) {
-            console.log("[WEBHOOK] Procesando entrada del webhook");
             const changes = value.changes;
             if (!changes || !Array.isArray(changes)) {
-                console.log("[WEBHOOK] Webhook inválido: changes no es un array");
                 continue;
             }
             for (const change of changes) {
@@ -117,22 +112,8 @@ const handleWebhook = (req, res) => __awaiter(void 0, void 0, void 0, function* 
                     organization: organization._id,
                 });
                 if (existingMessage) {
-                    console.log(`[WEBHOOK] Mensaje duplicado detectado:
-            - MessageId: ${message.id}
-            - Organization: ${organization._id}
-            - Timestamp original: ${existingMessage.timestamp}
-          `);
                     continue;
                 }
-                console.log(`[WEBHOOK] Creando nuevo mensaje:
-          - From: ${from}
-          - To: ${to}
-          - Type: ${type}
-          - MessageId: ${message.id}
-        `);
-                // Log del mensaje entrante
-                const contactName = ((_d = (_c = (_b = value.contacts) === null || _b === void 0 ? void 0 : _b[0]) === null || _c === void 0 ? void 0 : _c.profile) === null || _d === void 0 ? void 0 : _d.name) || "Sin nombre";
-                console.log(`[INCOMING] Mensaje de ${contactName} (${from}): ${((_e = message.text) === null || _e === void 0 ? void 0 : _e.body) || type}`);
                 let text = "";
                 let awsUrl = null;
                 if (type === "reaction") {
@@ -144,7 +125,6 @@ const handleWebhook = (req, res) => __awaiter(void 0, void 0, void 0, function* 
                 }
                 else if (["image", "document", "audio", "video", "sticker"].includes(type)) {
                     const mediaObject = message[type];
-                    console.log(`[WEBHOOK] Media recibido tipo=${type}: ${JSON.stringify(mediaObject || {}, null, 2)}`);
                     // Preferir caption cuando exista
                     const fallbackByType = {
                         image: "Imagen recibida",
@@ -155,16 +135,47 @@ const handleWebhook = (req, res) => __awaiter(void 0, void 0, void 0, function* 
                     };
                     text =
                         (mediaObject === null || mediaObject === void 0 ? void 0 : mediaObject.caption) || fallbackByType[type] || "Archivo recibido";
-                    console.log(`[WEBHOOK] Caption detectado: "${(mediaObject === null || mediaObject === void 0 ? void 0 : mediaObject.caption) || "(sin caption)"}"`);
                     if (mediaObject === null || mediaObject === void 0 ? void 0 : mediaObject.id) {
                         const mediaBuffer = yield (0, getMedia_1.getMedia)(mediaObject.id, accessToken);
-                        awsUrl = yield (0, aws_1.subirArchivo)(mediaBuffer, mediaObject.id, mediaObject.mime_type);
+                        // Determinar un nombre de archivo adecuado conservando la extensión
+                        const inferExtensionFromMime = (mime) => {
+                            if (!mime)
+                                return "";
+                            const map = {
+                                "application/pdf": "pdf",
+                                "application/postscript": "ps",
+                                "application/msword": "doc",
+                                "application/vnd.openxmlformats-officedocument.wordprocessingml.document": "docx",
+                                "application/vnd.ms-excel": "xls",
+                                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": "xlsx",
+                                "text/plain": "txt",
+                                "text/csv": "csv",
+                                "image/jpeg": "jpg",
+                                "image/png": "png",
+                                "image/gif": "gif",
+                                "video/mp4": "mp4",
+                                "audio/mpeg": "mp3",
+                                "audio/ogg": "ogg",
+                                "application/zip": "zip",
+                            };
+                            return map[mime] || (mime.split("/")[1] || "");
+                        };
+                        const ensureExtension = (name, mime) => {
+                            const hasExt = /\.[A-Za-z0-9]{1,8}$/.test(name);
+                            if (hasExt)
+                                return name;
+                            const ext = inferExtensionFromMime(mime);
+                            return ext ? `${name}.${ext}` : name;
+                        };
+                        const baseFilename = mediaObject.filename || mediaObject.id;
+                        const finalFilename = ensureExtension(baseFilename, mediaObject.mime_type);
+                        awsUrl = yield (0, aws_1.subirArchivo)(mediaBuffer, finalFilename, mediaObject.mime_type);
                     }
                 }
                 else {
                     text = "Otro tipo de mensaje recibido";
                 }
-                const repliedMessageId = (_f = message.context) === null || _f === void 0 ? void 0 : _f.id;
+                const repliedMessageId = (_b = message.context) === null || _b === void 0 ? void 0 : _b.id;
                 const originalMessage = repliedMessageId
                     ? yield MessageModel_1.default.findOne({ messageId: repliedMessageId })
                     : null;
@@ -179,22 +190,9 @@ const handleWebhook = (req, res) => __awaiter(void 0, void 0, void 0, function* 
                 let conversation = yield ConversationModel_1.default.findOne({
                     "participants.contact.reference": from,
                 });
-                /*
-                Una conversacion se crea doble si un chat que avanzo de etapa se vuelve a abrir?
-                No, no deben haber dos conversacion, tocaria buscarlas y actualizar la conversacion para reabrirla.
-        
-                Entonces:
-                1. Si no hay conversacion, crear una nueva
-                2. Si hay conversacion, actualizar la conversacion para reabrirla (como saber que currentStage es?)
-                3. Si hay conversacion, agregar el mensaje a la conversacion
-                */
                 // Crear conversación si no existe
                 if (!conversation) {
-                    console.log(`[WEBHOOK] Creando nueva conversación:
-            - Título: ${contactName}
-            - SystemUserId: ${systemUserId}
-            - Contact Reference: ${from}
-          `);
+                    const contactName = ((_e = (_d = (_c = value.contacts) === null || _c === void 0 ? void 0 : _c[0]) === null || _d === void 0 ? void 0 : _d.profile) === null || _e === void 0 ? void 0 : _e.name) || "Sin nombre";
                     conversation = yield ConversationModel_1.default.create({
                         title: contactName,
                         organization: organization,
@@ -216,23 +214,10 @@ const handleWebhook = (req, res) => __awaiter(void 0, void 0, void 0, function* 
                         firstContactTimestamp: new Date(),
                         metadata: [],
                     });
-                    console.log(`[WEBHOOK] Conversación creada:
-            - ID: ${conversation._id}
-            - Título: ${conversation.title}
-            - AssignedTo: ${conversation.assignedTo}
-          `);
                 }
                 else {
                     // Si la conversación existe, verificar si debe reabrirse
-                    console.log(`[WEBHOOK] Conversación existente:
-            - ID: ${conversation._id}
-            - Título actual: ${conversation.title}
-            - AssignedTo actual: ${conversation.assignedTo}
-          `);
-                    const wasReopened = yield (0, createConversation_1.reopenConversationIfClosed)(conversation);
-                    if (wasReopened) {
-                        console.log(`[WEBHOOK] Conversación ${conversation._id} fue reabierta automáticamente`);
-                    }
+                    yield (0, createConversation_1.reopenConversationIfClosed)(conversation);
                 }
                 // Crear mensaje
                 const newMessage = yield MessageModel_1.default.create({
@@ -242,23 +227,22 @@ const handleWebhook = (req, res) => __awaiter(void 0, void 0, void 0, function* 
                     to,
                     message: text,
                     mediaUrl: awsUrl,
-                    mediaId: ((_g = message[type]) === null || _g === void 0 ? void 0 : _g.id) || "",
+                    mediaId: ((_f = message[type]) === null || _f === void 0 ? void 0 : _f.id) || "",
+                    filename: ((_g = message[type]) === null || _g === void 0 ? void 0 : _g.filename) || undefined,
+                    mimeType: ((_h = message[type]) === null || _h === void 0 ? void 0 : _h.mime_type) || undefined,
                     timestamp: new Date(parseInt(timestamp) * 1000),
                     type,
                     direction: "incoming",
-                    possibleName: ((_k = (_j = (_h = value.contacts) === null || _h === void 0 ? void 0 : _h[0]) === null || _j === void 0 ? void 0 : _j.profile) === null || _k === void 0 ? void 0 : _k.name) || "",
+                    possibleName: ((_l = (_k = (_j = value.contacts) === null || _j === void 0 ? void 0 : _j[0]) === null || _k === void 0 ? void 0 : _k.profile) === null || _l === void 0 ? void 0 : _l.name) || "",
                     replyToMessage: (originalMessage === null || originalMessage === void 0 ? void 0 : originalMessage._id) || null,
                     messageId: message.id,
                     conversation: conversation._id,
                 });
-                console.log(`[WEBHOOK] Mensaje creado exitosamente con ID: ${newMessage._id}`);
                 // Actualizar la conversación con el último mensaje
-                console.log("[WEBHOOK] Actualizando conversación");
                 conversation.lastMessage = newMessage._id;
                 conversation.lastMessageTimestamp = newMessage.timestamp;
                 conversation.unreadCount = (conversation.unreadCount || 0) + 1;
                 yield conversation.save();
-                console.log("[WEBHOOK] Emitiendo eventos de socket");
                 // Emitir evento de nuevo mensaje a través de socket
                 const io = (0, socket_1.getSocketInstance)();
                 // Emitir a la sala de la conversación
@@ -269,7 +253,6 @@ const handleWebhook = (req, res) => __awaiter(void 0, void 0, void 0, function* 
                     contact: from,
                     conversationId: conversation._id,
                 });
-                console.log(`[SOCKET] Mensaje enviado a conversación ${conversation._id} y organización ${organization._id}`);
                 // Obtener tokens de push del usuario asignado
                 try {
                     const assignedUserId = conversation.assignedTo;
@@ -280,6 +263,7 @@ const handleWebhook = (req, res) => __awaiter(void 0, void 0, void 0, function* 
                         .filter((t) => expo_server_sdk_1.Expo.isExpoPushToken(t));
                     // Solo enviar si hay tokens válidos
                     if (toTokens.length > 0) {
+                        const contactName = ((_p = (_o = (_m = value.contacts) === null || _m === void 0 ? void 0 : _m[0]) === null || _o === void 0 ? void 0 : _o.profile) === null || _p === void 0 ? void 0 : _p.name) || "Sin nombre";
                         yield (0, pushNotificationService_1.sendNotification)(toTokens, {
                             title: contactName,
                             body: text,
@@ -288,7 +272,6 @@ const handleWebhook = (req, res) => __awaiter(void 0, void 0, void 0, function* 
                                 type: "whatsapp_message",
                             },
                         });
-                        console.log("[PUSH] Notificación enviada a", toTokens.length, "dispositivos");
                     }
                 }
                 catch (error) {
@@ -309,7 +292,6 @@ const handleWebhook = (req, res) => __awaiter(void 0, void 0, void 0, function* 
                     const isFirstMessage = messageCount === 1;
                     // Procesar el mensaje con el sistema de automatizaciones
                     yield AutomationExecutor.processIncomingMessage(conversation._id.toString(), organization._id.toString(), from, text, isFirstMessage);
-                    console.log(`[AUTOMATION] Procesado mensaje para conversación ${conversation._id}`);
                 }
                 catch (error) {
                     console.error(`[AUTOMATION] Error:`, error);

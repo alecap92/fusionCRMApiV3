@@ -14,6 +14,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.markMessagesAsRead = void 0;
 const MessageModel_1 = __importDefault(require("../../../models/MessageModel"));
+const ConversationModel_1 = __importDefault(require("../../../models/ConversationModel"));
 const markMessagesAsRead = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     var _a;
     const body = req.body;
@@ -31,6 +32,18 @@ const markMessagesAsRead = (req, res) => __awaiter(void 0, void 0, void 0, funct
             organization: organizationId,
             $or: [{ from: body.contact }, { to: body.contact }],
         }, { $set: { isRead: true } });
+        // Resetear el contador de no leídos en conversaciones relacionadas con este contacto
+        try {
+            const convResult = yield ConversationModel_1.default.updateMany({
+                organization: organizationId,
+                "participants.contact.reference": body.contact,
+                unreadCount: { $gt: 0 },
+            }, { $set: { unreadCount: 0 } });
+            // Success: no noisy logs
+        }
+        catch (convErr) {
+            console.error("Failed to reset conversations unreadCount by contact", convErr);
+        }
         res.status(200).json({ message: "Messages marked as read", updated });
     }
     catch (error) {

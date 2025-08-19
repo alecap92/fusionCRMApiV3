@@ -222,16 +222,11 @@ const refreshToken = (req, res) => __awaiter(void 0, void 0, void 0, function* (
 });
 exports.refreshToken = refreshToken;
 const logoutAllDevices = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    var _a, _b, _c;
+    var _a, _b;
     try {
         const userId = (_a = req.user) === null || _a === void 0 ? void 0 : _a._id;
         const organizationId = (_b = req.user) === null || _b === void 0 ? void 0 : _b.organizationId;
-        console.log("[LogoutAll] Iniciando proceso con:", {
-            userId,
-            organizationId,
-        });
         if (!userId || !organizationId) {
-            console.log("[LogoutAll] Error: Usuario no autenticado");
             return res.status(401).json({
                 success: false,
                 message: "Usuario no autenticado",
@@ -240,12 +235,7 @@ const logoutAllDevices = (req, res) => __awaiter(void 0, void 0, void 0, functio
         }
         // Obtener la organización y sus empleados
         const organization = yield OrganizationModel_1.default.findById(organizationId);
-        console.log("[LogoutAll] Organización encontrada:", {
-            organizationId,
-            employeesCount: ((_c = organization === null || organization === void 0 ? void 0 : organization.employees) === null || _c === void 0 ? void 0 : _c.length) || 0,
-        });
         if (!organization) {
-            console.log("[LogoutAll] Error: Organización no encontrada");
             return res.status(404).json({
                 success: false,
                 message: "Organización no encontrada",
@@ -257,14 +247,12 @@ const logoutAllDevices = (req, res) => __awaiter(void 0, void 0, void 0, functio
             _id: { $in: organization.employees },
             lastLogoutAt: { $exists: false },
         });
-        console.log(`[LogoutAll] Usuarios activos encontrados: ${users.length}`);
         // Actualizar el timestamp de último logout para todos los empleados
         const currentTime = new Date();
         const updateResult = yield UserModel_1.default.updateMany({ _id: { $in: organization.employees } }, {
             lastLogoutAt: currentTime,
             pushToken: [], // Limpiar tokens de notificación push
         });
-        console.log("[LogoutAll] Resultado de la actualización:", updateResult);
         // Registrar los resultados
         const logoutSummary = {
             totalEmployees: organization.employees.length,
@@ -273,7 +261,6 @@ const logoutAllDevices = (req, res) => __awaiter(void 0, void 0, void 0, functio
             timestamp: currentTime,
             organizationId: organizationId.toString(),
         };
-        console.log("[LogoutAll] Resumen de la operación:", logoutSummary);
         // Guardar el registro de la operación
         yield LogModel_1.default.create({
             type: "LOGOUT_ALL",

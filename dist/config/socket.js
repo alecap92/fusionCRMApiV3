@@ -159,7 +159,6 @@ const initializeSocket = (server) => {
     io = new socket_io_1.Server(server, {
         cors: CONFIG.CORS,
     });
-    console.log("Socket.IO inicializado correctamente");
     // Configurar el evento de conexión
     io.on("connection", handleNewConnection);
     return io;
@@ -219,7 +218,6 @@ const closeSocketConnection = () => {
         io.disconnectSockets(true);
         io.close();
         io = null;
-        console.log("Socket.IO cerrado correctamente");
     }
 };
 exports.closeSocketConnection = closeSocketConnection;

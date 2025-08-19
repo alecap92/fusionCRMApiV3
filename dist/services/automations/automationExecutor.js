@@ -57,7 +57,6 @@ class AutomationExecutor {
     static processIncomingMessage(conversationId_1, organizationId_1, contactNumber_1, message_1) {
         return __awaiter(this, arguments, void 0, function* (conversationId, organizationId, contactNumber, message, isFirstMessage = false) {
             try {
-                console.log(`[AutomationExecutor] Procesando mensaje: "${message}" de ${contactNumber}`);
                 // Buscar automatizaciones activas de tipo conversación para esta organización
                 const automations = yield AutomationModel_1.default.find({
                     organizationId,
@@ -72,7 +71,6 @@ class AutomationExecutor {
                         { "nodes.type": "trigger", "nodes.module": "whatsapp" },
                     ],
                 });
-                console.log(`[AutomationExecutor] Encontradas ${automations.length} automatizaciones activas`);
                 // Buscar conversación
                 const conversation = yield ConversationModel_1.default.findById(conversationId);
                 if (!conversation) {
@@ -84,7 +82,6 @@ class AutomationExecutor {
                     isPaused: false,
                 };
                 if (automationSettings.isPaused) {
-                    console.log(`[AutomationExecutor] Automatizaciones pausadas para conversación ${conversationId}`);
                     return;
                 }
                 // Contexto para la ejecución
@@ -104,7 +101,6 @@ class AutomationExecutor {
                 for (const automation of automations) {
                     const shouldExecute = yield this.shouldExecuteAutomation(automation, context);
                     if (shouldExecute) {
-                        console.log(`[AutomationExecutor] Ejecutando automatización: ${automation.name}`);
                         yield this.executeAutomation(automation, context);
                     }
                 }
@@ -165,7 +161,6 @@ class AutomationExecutor {
         return __awaiter(this, void 0, void 0, function* () {
             var _a, _b, _c, _d;
             try {
-                console.log(`[AutomationExecutor] Iniciando ejecución: ${automation.name}`);
                 // Verificar si se puede ejecutar basándose en el historial
                 const conversation = yield ConversationModel_1.default.findById(context.conversationId);
                 if (!conversation) {
@@ -178,7 +173,6 @@ class AutomationExecutor {
                     automationType: ((_a = automation._id) === null || _a === void 0 ? void 0 : _a.toString()) || "",
                 });
                 if (!canTrigger) {
-                    console.log(`[AutomationExecutor] Automatización ya ejecutada recientemente, omitiendo`);
                     return;
                 }
                 // Si la automatización tiene nodos (editor visual), ejecutar flujo de nodos
@@ -206,7 +200,6 @@ class AutomationExecutor {
      */
     static executeNodeFlow(automation, context) {
         return __awaiter(this, void 0, void 0, function* () {
-            console.log(`[AutomationExecutor] Ejecutando flujo visual con ${automation.nodes.length} nodos`);
             // Encontrar el nodo trigger
             const triggerNode = automation.nodes.find((n) => n.type === "trigger");
             if (!triggerNode) {
@@ -223,7 +216,6 @@ class AutomationExecutor {
     static executeNodeRecursive(node, allNodes, context) {
         return __awaiter(this, void 0, void 0, function* () {
             var _a;
-            console.log(`[AutomationExecutor] Ejecutando nodo: ${node.id} (${node.type})`);
             // Ejecutar según el tipo de nodo
             switch (node.type) {
                 case "trigger":
@@ -244,7 +236,6 @@ class AutomationExecutor {
                     return; // Las condiciones manejan su propio flujo
                 case "delay":
                     const delayMs = (((_a = node.data) === null || _a === void 0 ? void 0 : _a.delay) || 5) * 1000;
-                    console.log(`[AutomationExecutor] Esperando ${delayMs}ms`);
                     yield new Promise((resolve) => setTimeout(resolve, delayMs));
                     break;
             }
@@ -268,7 +259,6 @@ class AutomationExecutor {
             // Manejar nodos del editor visual
             if (node.module === "whatsapp" || node.module === "send_whatsapp") {
                 const message = this.processTemplate(((_a = node.data) === null || _a === void 0 ? void 0 : _a.message) || "", context.variables);
-                console.log(`[AutomationExecutor] Enviando mensaje WhatsApp: "${message}" a ${context.contactNumber}`);
                 try {
                     // Importar el helper de WhatsApp
                     const { sendWhatsAppMessage } = yield Promise.resolve().then(() => __importStar(require("./whatsappHelper")));
@@ -356,7 +346,6 @@ class AutomationExecutor {
             var _a, _b, _c;
             if (node.module === "whatsapp" && node.event === "send_message") {
                 const message = this.processTemplate(((_a = node.data) === null || _a === void 0 ? void 0 : _a.message) || "", context.variables);
-                console.log(`[AutomationExecutor] Enviando mensaje WhatsApp: "${message}" a ${context.contactNumber}`);
                 try {
                     // Importar el helper de WhatsApp
                     const { sendWhatsAppMessage } = yield Promise.resolve().then(() => __importStar(require("./whatsappHelper")));

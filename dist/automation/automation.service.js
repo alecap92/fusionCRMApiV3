@@ -19,7 +19,6 @@ function ejecutarNodo(nodoId, nodesMap, context) {
             return;
         }
         if (nodo.type === "trigger") {
-            console.log("⏭️ Nodo trigger, saltando ejecución. Pasando al siguiente...");
             const siguientes = nodo.next || [];
             for (const nextId of siguientes) {
                 yield ejecutarNodo(nextId, nodesMap, context);
@@ -31,7 +30,6 @@ function ejecutarNodo(nodoId, nodesMap, context) {
             console.warn(`⚠️ Tipo de nodo no soportado: ${nodo.type}`);
             return;
         }
-        console.log(`▶️ Ejecutando nodo: ${nodo.id} [${nodo.type}]`);
         const resultado = yield handler(nodo, context);
         let siguientes = [];
         if (nodo.type === "condition") {

@@ -86,7 +86,6 @@ const importDeals = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
                 if (mappedKey === "ignore" || !mappedKey)
                     continue;
                 if (mappedKey === "status") {
-                    console.log(mappedKey);
                     const status = yield StatusModel_1.default.findOne({ name: value }, organizationId).exec();
                     if (status) {
                         dealData.status = status._id;

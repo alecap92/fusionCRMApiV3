@@ -33,7 +33,6 @@ const createDeal = (req, res) => __awaiter(void 0, void 0, void 0, function* () 
         if (!title || !amount || !(contact === null || contact === void 0 ? void 0 : contact.mobile) || !organizationId) {
             return res.status(400).json({ message: "Faltan datos obligatorios" });
         }
-        console.log("Request Data:", req.body, pipeline, status, organizationId);
         let associatedContactId;
         // Buscar si ya existe un contacto con ese número de móvil en la organización
         const contactExists = yield ContactModel_1.default.findOne({
@@ -64,7 +63,6 @@ const createDeal = (req, res) => __awaiter(void 0, void 0, void 0, function* () 
                 properties,
             });
             associatedContactId = newContact._id;
-            console.log("Nuevo contacto creado:", newContact);
         }
         // Crear el negocio (deal)
         const newDeal = yield DealsModel_1.default.create({

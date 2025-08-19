@@ -67,10 +67,30 @@ const getContacts = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
             .skip((page - 1) * limit + offset)
             .limit(limit)
             .sort({ createdAt: -1 })
+            .lean()
             .exec();
         const total = yield ContactModel_1.default.countDocuments({ organizationId });
+        // Calcular totalRevenue por contacto
+        const contactIds = contacts.map((c) => c._id);
+        let revenueByContact = {};
+        if (contactIds.length > 0) {
+            const revenueAgg = yield DealsModel_1.default.aggregate([
+                { $match: { associatedContactId: { $in: contactIds } } },
+                {
+                    $group: {
+                        _id: "$associatedContactId",
+                        totalRevenue: { $sum: { $ifNull: ["$amount", 0] } },
+                    },
+                },
+            ]).exec();
+            revenueByContact = revenueAgg.reduce((acc, cur) => {
+                acc[String(cur._id)] = cur.totalRevenue || 0;
+                return acc;
+            }, {});
+        }
+        const contactsWithRevenue = contacts.map((c) => (Object.assign(Object.assign({}, c), { totalRevenue: revenueByContact[String(c._id)] || 0 })));
         res.status(200).json({
-            data: contacts,
+            data: contactsWithRevenue,
             total,
         });
     }
@@ -188,8 +208,28 @@ const searchContact = (req, res) => __awaiter(void 0, void 0, void 0, function* 
         })
             .limit(limitNumber)
             .skip((pageNumber - 1) * limitNumber)
+            .lean()
             .exec();
-        res.status(200).json(contacts);
+        // Calcular totalRevenue por contacto en resultados de búsqueda
+        const contactIds = contacts.map((c) => c._id);
+        let revenueByContact = {};
+        if (contactIds.length > 0) {
+            const revenueAgg = yield DealsModel_1.default.aggregate([
+                { $match: { associatedContactId: { $in: contactIds } } },
+                {
+                    $group: {
+                        _id: "$associatedContactId",
+                        totalRevenue: { $sum: { $ifNull: ["$amount", 0] } },
+                    },
+                },
+            ]).exec();
+            revenueByContact = revenueAgg.reduce((acc, cur) => {
+                acc[String(cur._id)] = cur.totalRevenue || 0;
+                return acc;
+            }, {});
+        }
+        const contactsWithRevenue = contacts.map((c) => (Object.assign(Object.assign({}, c), { totalRevenue: revenueByContact[String(c._id)] || 0 })));
+        res.status(200).json(contactsWithRevenue);
     }
     catch (error) {
         console.error("Error buscando contactos:", error);
@@ -246,10 +286,30 @@ const filterContacts = (req, res) => __awaiter(void 0, void 0, void 0, function*
             .skip((page - 1) * limit)
             .limit(limit)
             .sort({ createdAt: -1 })
+            .lean()
             .exec();
         const total = yield ContactModel_1.default.countDocuments(query);
+        // Calcular totalRevenue para resultados filtrados
+        const contactIds = contacts.map((c) => c._id);
+        let revenueByContact = {};
+        if (contactIds.length > 0) {
+            const revenueAgg = yield DealsModel_1.default.aggregate([
+                { $match: { associatedContactId: { $in: contactIds } } },
+                {
+                    $group: {
+                        _id: "$associatedContactId",
+                        totalRevenue: { $sum: { $ifNull: ["$amount", 0] } },
+                    },
+                },
+            ]).exec();
+            revenueByContact = revenueAgg.reduce((acc, cur) => {
+                acc[String(cur._id)] = cur.totalRevenue || 0;
+                return acc;
+            }, {});
+        }
+        const contactsWithRevenue = contacts.map((c) => (Object.assign(Object.assign({}, c), { totalRevenue: revenueByContact[String(c._id)] || 0 })));
         res.status(200).json({
-            data: contacts,
+            data: contactsWithRevenue,
             total,
             page,
             limit,

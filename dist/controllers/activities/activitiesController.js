@@ -19,7 +19,6 @@ const createActivity = (req, res) => __awaiter(void 0, void 0, void 0, function*
     var _a, _b;
     try {
         const organizationId = (_a = req.user) === null || _a === void 0 ? void 0 : _a.organizationId;
-        console.log(req.body);
         const form = {
             activityType: req.body.activityType,
             title: req.body.title,
@@ -80,7 +79,6 @@ const getActivity = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
 exports.getActivity = getActivity;
 // Actualizar actividad
 const updateActivity = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    console.log(req.body);
     try {
         const updatedActivity = yield ActivityModel_1.default.findOneAndUpdate({ _id: req.body._id }, { $set: req.body }, { new: true });
         if (!updatedActivity) {
