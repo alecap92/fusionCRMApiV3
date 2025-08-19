@@ -294,7 +294,7 @@ export const addMessage = async (
 
     // Crear el nuevo mensaje
     // Creando nuevo mensaje en la base de datos
-    const effectiveFrom = from || senderPhoneNumber || (direction === "outgoing" ? "system" : to);
+    const effectiveFrom = from || senderPhoneNumber || (direction === "outgoing" ? to : to);
     logger.info("[ADD_MESSAGE] Determinación del remitente (from)", {
       providedFrom: from || null,
       senderPhoneNumber: senderPhoneNumber || null,
