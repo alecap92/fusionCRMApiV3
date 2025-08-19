@@ -57,6 +57,8 @@ export const addMessage = async (
       organization: organizationId,
     });
 
+    console.log("conversation", conversationId, organizationId);
+
     if (!conversation) {
       return res.status(404).json({
         success: false,
