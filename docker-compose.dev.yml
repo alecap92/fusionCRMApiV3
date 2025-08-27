@@ -1,0 +1,62 @@
+services:
+  backend-dev:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: fusioncol-backend-dev
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=development
+      - PORT=3000
+      # Variables de entorno para desarrollo
+      # - MONGODB_URI=mongodb://mongo:27017/fusioncol-dev
+      # - REDIS_URL=redis://redis:6379
+    volumes:
+      # Montar el código fuente para hot reload
+      - ./src:/app/src
+      - ./public:/app/public
+      - ./package.json:/app/package.json
+      - ./tsconfig.json:/app/tsconfig.json
+    depends_on:
+      - mongo-dev
+      - redis-dev
+    restart: unless-stopped
+    networks:
+      - fusioncol-dev-network
+
+  # MongoDB para desarrollo
+  mongo-dev:
+    image: mongo:6.0
+    container_name: fusioncol-mongo-dev
+    ports:
+      - "27018:27017"
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=admin
+      - MONGO_INITDB_ROOT_PASSWORD=password
+      - MONGO_INITDB_DATABASE=fusioncol-dev
+    volumes:
+      - mongo_dev_data:/data/db
+    restart: unless-stopped
+    networks:
+      - fusioncol-dev-network
+
+  # Redis para desarrollo
+  redis-dev:
+    image: redis:7-alpine
+    container_name: fusioncol-redis-dev
+    ports:
+      - "6380:6379"
+    volumes:
+      - redis_dev_data:/data
+    restart: unless-stopped
+    networks:
+      - fusioncol-dev-network
+
+volumes:
+  mongo_dev_data:
+  redis_dev_data:
+
+networks:
+  fusioncol-dev-network:
+    driver: bridge
