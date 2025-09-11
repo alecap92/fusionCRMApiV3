@@ -33,8 +33,7 @@ const pushTokenRouter_1 = __importDefault(require("./pushTokenRouter"));
 const sendMasiveEmails_1 = __importDefault(require("./sendMasiveEmails"));
 const emailMarketingRouter_1 = __importDefault(require("./emailMarketingRouter"));
 const emailTemplatesRouter_1 = __importDefault(require("./emailTemplatesRouter"));
-const contactsApi_1 = __importDefault(require("./contactsApi"));
-const dealsApi_1 = __importDefault(require("./dealsApi"));
+const apiRouter_1 = __importDefault(require("./apiRouter"));
 const downloadDealsRouter_1 = __importDefault(require("./downloadDealsRouter"));
 const automationRouter_1 = __importDefault(require("./automationRouter"));
 const invoiceRouter_1 = __importDefault(require("./invoiceRouter"));
@@ -55,6 +54,7 @@ const analyticsRouter_1 = __importDefault(require("./analyticsRouter"));
 const strategyRouter_1 = __importDefault(require("./strategyRouter"));
 const conversation_routes_1 = __importDefault(require("./conversation.routes"));
 const automationSystemRouter_1 = __importDefault(require("./automationSystemRouter"));
+const n8nRouter_1 = __importDefault(require("./n8nRouter"));
 const routes = {
     authRouter: authRouter_1.default,
     downloadDealsRouter: downloadDealsRouter_1.default,
@@ -87,8 +87,7 @@ const routes = {
     sendMasiveEmailsRouter: sendMasiveEmails_1.default,
     emailMarketing: emailMarketingRouter_1.default,
     emailTemplatesRouter: emailTemplatesRouter_1.default,
-    contactsApi: contactsApi_1.default,
-    dealsApi: dealsApi_1.default,
+    apiRouter: apiRouter_1.default,
     automationRouter: automationRouter_1.default,
     automationSystemRouter: automationSystemRouter_1.default,
     invoiceRouter: invoiceRouter_1.default,
@@ -108,5 +107,6 @@ const routes = {
     analyticsRouter: analyticsRouter_1.default,
     strategyRouter: strategyRouter_1.default,
     conversationRouter: conversation_routes_1.default,
+    n8nRouter: n8nRouter_1.default,
 };
 exports.default = routes;

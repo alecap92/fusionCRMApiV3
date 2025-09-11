@@ -59,6 +59,7 @@ const ConversationPipelineModel_1 = __importDefault(require("../../../models/Con
 const socket_1 = require("../../../config/socket");
 const UserModel_1 = __importDefault(require("../../../models/UserModel"));
 const createConversation_1 = require("../../../services/conversations/createConversation");
+const whatsappWebhookService_1 = __importDefault(require("../../../services/n8n/whatsappWebhookService"));
 const handleWebhook = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l, _m, _o, _p;
     try {
@@ -158,7 +159,7 @@ const handleWebhook = (req, res) => __awaiter(void 0, void 0, void 0, function* 
                                 "audio/ogg": "ogg",
                                 "application/zip": "zip",
                             };
-                            return map[mime] || (mime.split("/")[1] || "");
+                            return map[mime] || mime.split("/")[1] || "";
                         };
                         const ensureExtension = (name, mime) => {
                             const hasExt = /\.[A-Za-z0-9]{1,8}$/.test(name);
@@ -277,6 +278,18 @@ const handleWebhook = (req, res) => __awaiter(void 0, void 0, void 0, function* 
                 catch (error) {
                     console.error("[PUSH] Error enviando notificación:", error);
                 }
+                // Enviar webhook a N8N con todos los datos del mensaje
+                yield (0, whatsappWebhookService_1.default)({
+                    message: text,
+                    conversationId: conversation._id.toString(),
+                    from,
+                    to,
+                    organizationId: organization._id.toString(),
+                    timestamp: new Date(parseInt(timestamp) * 1000),
+                    lastMessageTimestamp: conversation.lastMessageTimestamp ||
+                        new Date(parseInt(timestamp) * 1000),
+                    whatsappData: req.body, // Enviar todo el objeto de WhatsApp
+                });
                 (0, notificationController_1.emitNewNotification)("whatsapp", organization._id, 1, from, {
                     message: text,
                     timestamp: new Date(parseInt(timestamp) * 1000),

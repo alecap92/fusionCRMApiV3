@@ -28,8 +28,7 @@ import pushTokenRouter from "./pushTokenRouter";
 import sendMasiveEmailsRouter from "./sendMasiveEmails";
 import emailMarketing from "./emailMarketingRouter";
 import emailTemplatesRouter from "./emailTemplatesRouter";
-import contactsApi from "./contactsApi";
-import dealsApi from "./dealsApi";
+import apiRouter from "./apiRouter";
 import downloadDealsRouter from "./downloadDealsRouter";
 import automationRouter from "./automationRouter";
 import invoiceRouter from "./invoiceRouter";
@@ -50,6 +49,7 @@ import analyticsRouter from "./analyticsRouter";
 import strategyRouter from "./strategyRouter";
 import conversationRouter from "./conversation.routes";
 import automationSystemRouter from "./automationSystemRouter";
+import n8nRouter from "./n8nRouter";
 
 const routes = {
   authRouter,
@@ -83,8 +83,7 @@ const routes = {
   sendMasiveEmailsRouter,
   emailMarketing,
   emailTemplatesRouter,
-  contactsApi,
-  dealsApi,
+  apiRouter,
   automationRouter,
   automationSystemRouter,
   invoiceRouter,
@@ -104,6 +103,7 @@ const routes = {
   analyticsRouter,
   strategyRouter,
   conversationRouter,
+  n8nRouter,
 };
 
 export default routes;

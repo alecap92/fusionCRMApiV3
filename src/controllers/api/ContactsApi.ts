@@ -6,6 +6,23 @@ export const createContact = async (req: Request, res: Response) => {
     const organizationId = req.query.organizationId;
     const body = req.body;
 
+    console.log(body, organizationId);
+
+    if (!body.whatsapp_phone) {
+      return res.status(400).json({ error: "Whatsapp phone is required" });
+    }
+
+    // debemos verificar si el contacto ya existe
+    const contactExists = await ContactModel.findOne({
+      organizationId: organizationId,
+      "properties.key": "mobile",
+      "properties.value": body.whatsapp_phone,
+    });
+
+    if (contactExists) {
+      return res.status(200).json(contactExists);
+    }
+
     const createContact = {
       organizationId: organizationId,
       properties: [
@@ -31,7 +48,7 @@ export const createContact = async (req: Request, res: Response) => {
         },
         {
           key: "source",
-          value: "API",
+          value: body.source || "",
           isVisible: true,
         },
         {

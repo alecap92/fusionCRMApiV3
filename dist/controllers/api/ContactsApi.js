@@ -19,6 +19,19 @@ const createContact = (req, res) => __awaiter(void 0, void 0, void 0, function* 
     try {
         const organizationId = req.query.organizationId;
         const body = req.body;
+        console.log(body, organizationId);
+        if (!body.whatsapp_phone) {
+            return res.status(400).json({ error: "Whatsapp phone is required" });
+        }
+        // debemos verificar si el contacto ya existe
+        const contactExists = yield ContactModel_1.default.findOne({
+            organizationId: organizationId,
+            "properties.key": "mobile",
+            "properties.value": body.whatsapp_phone,
+        });
+        if (contactExists) {
+            return res.status(200).json(contactExists);
+        }
         const createContact = {
             organizationId: organizationId,
             properties: [
@@ -44,7 +57,7 @@ const createContact = (req, res) => __awaiter(void 0, void 0, void 0, function* 
                 },
                 {
                     key: "source",
-                    value: "API",
+                    value: body.source || "",
                     isVisible: true,
                 },
                 {

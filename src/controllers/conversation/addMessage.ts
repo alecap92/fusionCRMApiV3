@@ -33,26 +33,10 @@ export const addMessage = async (
     } = req.body;
 
     // Validación y trazas mínimas
-    logger.info("[ADD_MESSAGE] Inicio solicitud", {
-      conversationId,
-      direction,
-      type,
-      hasMessage: Boolean(message && String(message).trim()),
-      hasMediaUrl: Boolean(mediaUrl),
-      hasMediaId: Boolean(mediaId),
-      to,
-      replyToMessage: replyToMessage || null,
-      messageId: messageId || null,
-      filename: filename || null,
-      mimeType: mimeType || null,
-    });
 
-    const organizationId = (req as any)?.user?.organizationId || (req as any)?.organization;
+    const organizationId =
+      (req as any)?.user?.organizationId || (req as any)?.organization;
     const userId = req.user?._id;
-    logger.info("[ADD_MESSAGE] Contexto de seguridad", {
-      organizationId,
-      userId,
-    });
 
     // Validaciones básicas
     if (!to || !type || !direction) {
@@ -81,12 +65,6 @@ export const addMessage = async (
       organization: organizationId,
     });
 
-    logger.info("[ADD_MESSAGE] Verificación de conversación", {
-      conversationId,
-      organizationId,
-      found: Boolean(conversation),
-    });
-
     if (!conversation) {
       logger.warn("[ADD_MESSAGE] Conversación no encontrada", {
         conversationId,
@@ -100,9 +78,6 @@ export const addMessage = async (
 
     // Si es un mensaje entrante, verificar si la conversación debe reabrirse
     if (direction === "incoming") {
-      logger.info("[ADD_MESSAGE] Mensaje entrante: reabrir conversación si aplica", {
-        conversationId,
-      });
       await reopenConversationIfClosed(conversation);
     }
 
@@ -130,9 +105,7 @@ export const addMessage = async (
     let senderPhoneNumber: string | undefined;
     if (direction === "outgoing") {
       // Buscar integración de WhatsApp
-      logger.info("[ADD_MESSAGE] Mensaje saliente: consultando integración de WhatsApp", {
-        organizationId,
-      });
+
       const integration = await IntegrationsModel.findOne({
         organizationId: organizationId,
         service: "whatsapp",
@@ -149,9 +122,11 @@ export const addMessage = async (
       }
 
       const apiUrl = process.env.WHATSAPP_API_URL as string;
-      const phoneNumberId = integration.credentials?.numberIdIdentifier as string;
+      const phoneNumberId = integration.credentials
+        ?.numberIdIdentifier as string;
       const accessToken = integration.credentials?.accessToken as string;
-      senderPhoneNumber = (integration.credentials as any)?.phoneNumber || undefined;
+      senderPhoneNumber =
+        (integration.credentials as any)?.phoneNumber || undefined;
 
       if (!apiUrl || !phoneNumberId || !accessToken) {
         logger.warn("[ADD_MESSAGE] Credenciales de WhatsApp incompletas", {
@@ -166,12 +141,6 @@ export const addMessage = async (
       }
 
       const whatsappApiUrl = `${apiUrl}/${phoneNumberId}/messages`;
-      logger.info("[ADD_MESSAGE] Enviando a WhatsApp API", {
-        whatsappApiUrl,
-        type,
-        to,
-        hasMediaUrl: Boolean(mediaUrl),
-      });
 
       // Construir payload según el tipo
       let payload: any;
@@ -181,7 +150,8 @@ export const addMessage = async (
             if (!message) {
               return res.status(400).json({
                 success: false,
-                message: "El campo 'message' es requerido para mensajes de texto",
+                message:
+                  "El campo 'message' es requerido para mensajes de texto",
               });
             }
             payload = {
@@ -279,7 +249,9 @@ export const addMessage = async (
         outgoingMessageId = response.data?.messages?.[0]?.id;
       } catch (sendError: any) {
         const status = sendError?.response?.status || 500;
-        const details = sendError?.response?.data || { message: sendError?.message };
+        const details = sendError?.response?.data || {
+          message: sendError?.message,
+        };
         logger.error("[ADD_MESSAGE] Error al enviar mensaje a WhatsApp", {
           status,
           details,
@@ -294,12 +266,9 @@ export const addMessage = async (
 
     // Crear el nuevo mensaje
     // Creando nuevo mensaje en la base de datos
-    const effectiveFrom = from || senderPhoneNumber || (direction === "outgoing" ? to : to);
-    logger.info("[ADD_MESSAGE] Determinación del remitente (from)", {
-      providedFrom: from || null,
-      senderPhoneNumber: senderPhoneNumber || null,
-      effectiveFrom,
-    });
+    const effectiveFrom =
+      from || senderPhoneNumber || (direction === "outgoing" ? to : to);
+
     const newMessage = new Message({
       user: userId,
       organization: organizationId,
@@ -322,12 +291,6 @@ export const addMessage = async (
     });
 
     await newMessage.save();
-    logger.info("[ADD_MESSAGE] Mensaje guardado", {
-      messageDbId: (newMessage as any)?._id,
-      conversationId,
-      direction,
-      type,
-    });
 
     // Actualizar la conversación con la referencia al último mensaje
     // Actualizando conversación con el nuevo mensaje
@@ -356,11 +319,6 @@ export const addMessage = async (
     }
 
     await conversation.save();
-    logger.info("[ADD_MESSAGE] Conversación actualizada", {
-      conversationId: conversation._id,
-      lastMessageTimestamp: conversation.lastMessageTimestamp,
-      unreadCount: conversation.unreadCount,
-    });
 
     return res.status(201).json({
       success: true,
@@ -400,7 +358,8 @@ export const markConversationAsRead = async (
     const { conversationId } = req.params;
     // Algunos middlewares adjuntan la organización como req.user.organizationId.
     // Aseguramos compatibilidad tomando primero la de usuario y luego el fallback.
-    const organizationId = (req as any)?.user?.organizationId || (req as any)?.organization;
+    const organizationId =
+      (req as any)?.user?.organizationId || (req as any)?.organization;
 
     // Verificar que la conversación existe
     const conversation = await Conversation.findOne({

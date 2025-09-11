@@ -16,9 +16,7 @@ exports.deleteConversation = void 0;
 const ConversationModel_1 = __importDefault(require("../../models/ConversationModel"));
 const MessageModel_1 = __importDefault(require("../../models/MessageModel"));
 const deleteConversation = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    var _a;
     const { id } = req.params;
-    const organizationId = (_a = req.user) === null || _a === void 0 ? void 0 : _a.organizationId;
     try {
         // Delete all messages
         yield MessageModel_1.default.deleteMany({ conversation: id });
@@ -30,6 +28,10 @@ const deleteConversation = (req, res) => __awaiter(void 0, void 0, void 0, funct
                 message: "Conversación no encontrada",
             });
         }
+        return res.status(200).json({
+            success: true,
+            message: "Conversación eliminada correctamente",
+        });
     }
     catch (error) {
         return res.status(500).json({

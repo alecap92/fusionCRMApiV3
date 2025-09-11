@@ -35,3 +35,4 @@ ENV PORT=3000
 
 # Comando para desarrollo con nodemon
 CMD ["npm", "run", "dev"]
+

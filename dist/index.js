@@ -158,8 +158,7 @@ const configureRoutes = (app) => {
         { path: "/api/v1/files", router: routes_1.default.fileRouter },
         { path: "/api/v1/forms", router: routes_1.default.formRouter },
         { path: "/api/v1/email", router: routes_1.default.emailrouter },
-        { path: "/api/v1/contactsApi", router: routes_1.default.contactsApi },
-        { path: "/api/v1/dealsApi", router: routes_1.default.dealsApi },
+        { path: "/api", router: routes_1.default.apiRouter },
         { path: "/api/v1/download-deals", router: routes_1.default.downloadDealsRouter },
         {
             path: "/api/v1/documents",
@@ -172,6 +171,10 @@ const configureRoutes = (app) => {
         {
             path: "/api/v1/conversation",
             router: routes_1.default.conversationRouter,
+        },
+        {
+            path: "/api/v1/n8n",
+            router: routes_1.default.n8nRouter,
         },
     ];
     // Registrar rutas protegidas

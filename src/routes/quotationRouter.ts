@@ -9,11 +9,13 @@ import {
   advancedFilterQuotations,
   printQuotation,
   sendQuotationEmail,
+  getNextQuotationNumber,
 } from "../controllers/quotations/quotationController";
 
 const router: Router = Router();
 
 router.get("/search", searchQuotation); // Search for quotations based on a term
+router.get("/next-quotation-number", getNextQuotationNumber); // Get next quotation number (atomic)
 router.get("/print/:id", printQuotation);
 router.get("/:id", getQuotation); // Get a single quotation by ID
 router.get("/", getQuotations); // Get all quotations

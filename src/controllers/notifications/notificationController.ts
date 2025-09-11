@@ -57,7 +57,6 @@ export const emitNewNotification = (
       notificationTitle = "Nuevo formulario recibido:" + " " + message.message;
       break;
   }
-  console.log(notificationTitle);
 
   // Emitir notificación a la sala específica de la organización
   io.to(`organization_${organizationId}`).emit("newNotification", {

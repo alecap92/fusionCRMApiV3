@@ -12,11 +12,12 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.sendQuotationEmail = exports.printQuotation = exports.advancedFilterQuotations = exports.deleteQuotation = exports.updateQuotation = exports.createQuotation = exports.searchQuotation = exports.getQuotations = exports.getQuotation = void 0;
+exports.createQuotationApi = exports.sendQuotationEmail = exports.printQuotation = exports.advancedFilterQuotations = exports.deleteQuotation = exports.updateQuotation = exports.createQuotation = exports.searchQuotation = exports.getQuotations = exports.getQuotation = void 0;
 const QuotationModel_1 = __importDefault(require("../../models/QuotationModel"));
 const OrganizationModel_1 = __importDefault(require("../../models/OrganizationModel"));
 const printQuotationService_1 = require("../../services/quotation/printQuotationService");
 const IntegrationsModel_1 = __importDefault(require("../../models/IntegrationsModel"));
+const ContactModel_1 = __importDefault(require("../../models/ContactModel"));
 // Get a single quotation by ID
 const getQuotation = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     var _a;
@@ -313,3 +314,80 @@ const sendQuotationEmail = (req, res) => __awaiter(void 0, void 0, void 0, funct
     }
 });
 exports.sendQuotationEmail = sendQuotationEmail;
+const createQuotationApi = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a, _b;
+    try {
+        /*
+          Objetivo: Crear una cotización en la base de datos desde la API.
+    
+          Importante:
+          1. Validar el contacto este creado o crearlo.
+          2. Inferir el numero de cotización desde la organización.
+          3. El organizationId se obtiene del token de API autenticado.
+        */
+        // Obtener organizationId y userId del token de API
+        const organizationId = (_a = req.apiUser) === null || _a === void 0 ? void 0 : _a.organizationId;
+        const userId = (_b = req.apiUser) === null || _b === void 0 ? void 0 : _b._id;
+        if (!organizationId || !userId) {
+            return res.status(401).json({
+                message: "Token de API no válido",
+                code: "INVALID_API_TOKEN",
+            });
+        }
+        const { contact, quotationNumber, items, expirationDate, lastModified, name, observaciones, paymentTerms, shippingTerms, status, subtotal, taxes, total, } = req.body;
+        if (!contact ||
+            !quotationNumber ||
+            !items ||
+            !expirationDate ||
+            !lastModified ||
+            !name ||
+            !observaciones ||
+            !paymentTerms ||
+            !shippingTerms ||
+            !status ||
+            !subtotal ||
+            !taxes ||
+            !total) {
+            return res.status(400).json({ message: "Faltan datos requeridos" });
+        }
+        const contactExists = yield ContactModel_1.default.findOne({
+            _id: contact,
+            organizationId,
+        });
+        if (!contactExists) {
+            return res.status(400).json({ message: "Contacto no encontrado" });
+        }
+        const quotationNumberExists = yield QuotationModel_1.default.findOne({
+            organizationId,
+            quotationNumber: Number(quotationNumber),
+        });
+        if (quotationNumberExists) {
+            return res
+                .status(400)
+                .json({ message: "Numero de cotizacion no disponible" });
+        }
+        const newQuotation = yield QuotationModel_1.default.create({
+            contactId: contactExists._id,
+            quotationNumber: Number(quotationNumber),
+            items,
+            expirationDate,
+            lastModified,
+            name,
+            observaciones,
+            paymentTerms,
+            shippingTerms,
+            status,
+            subtotal,
+            taxes,
+            total,
+            userId,
+            organizationId,
+        });
+        const quotation = yield QuotationModel_1.default.findById(newQuotation._id).populate("contactId");
+        res.status(200).json(quotation);
+    }
+    catch (error) {
+        res.status(500).json({ message: "Server error", error });
+    }
+});
+exports.createQuotationApi = createQuotationApi;

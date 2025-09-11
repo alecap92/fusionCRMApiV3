@@ -3,6 +3,7 @@ import {
   getContacts,
   createContact,
   deleteContact,
+  deleteContactById,
   getContact,
   updateContact,
   searchContact,
@@ -20,6 +21,7 @@ router.post("/filter", filterContacts);
 router.post("/", createContact);
 router.post("/advanced-filter", advancedFilterContacts);
 router.delete("/", deleteContact);
+router.delete("/:id", deleteContactById);
 router.put("/:id", updateContact);
 router.get("/:id", getContact);
 

@@ -4,7 +4,6 @@ import MessageModel from "../../models/MessageModel";
 
 export const deleteConversation = async (req: Request, res: Response) => {
   const { id } = req.params;
-  const organizationId = req.user?.organizationId;
 
   try {
     // Delete all messages
@@ -19,6 +18,11 @@ export const deleteConversation = async (req: Request, res: Response) => {
         message: "Conversación no encontrada",
       });
     }
+
+    return res.status(200).json({
+      success: true,
+      message: "Conversación eliminada correctamente",
+    });
   } catch (error) {
     return res.status(500).json({
       success: false,

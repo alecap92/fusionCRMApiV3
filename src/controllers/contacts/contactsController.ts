@@ -85,10 +85,13 @@ export const getContacts = async (req: Request, res: Response) => {
           },
         },
       ]).exec();
-      revenueByContact = revenueAgg.reduce((acc: Record<string, number>, cur: any) => {
-        acc[String(cur._id)] = cur.totalRevenue || 0;
-        return acc;
-      }, {});
+      revenueByContact = revenueAgg.reduce(
+        (acc: Record<string, number>, cur: any) => {
+          acc[String(cur._id)] = cur.totalRevenue || 0;
+          return acc;
+        },
+        {}
+      );
     }
 
     const contactsWithRevenue = contacts.map((c: any) => ({
@@ -140,6 +143,35 @@ export const deleteContact = async (req: Request, res: Response) => {
     res.status(200).json({ message: "Contactos eliminados", deletedContacts });
   } catch (error) {
     console.error("Error eliminando los contactos:", error);
+    res.status(500).json({ message: "Error en el servidor" });
+  }
+};
+
+// Eliminar un contacto individual
+export const deleteContactById = async (req: Request, res: Response) => {
+  const contactId = req.params.id;
+  const organizationId = req.user?.organizationId;
+
+  if (!organizationId) {
+    return res.status(401).json({ message: "No autorizado" });
+  }
+
+  try {
+    const deletedContact = await Contact.findOneAndDelete({
+      _id: contactId,
+      organizationId,
+    });
+
+    if (!deletedContact) {
+      return res.status(404).json({ message: "Contacto no encontrado" });
+    }
+
+    res.status(200).json({
+      message: "Contacto eliminado correctamente",
+      deletedContact,
+    });
+  } catch (error) {
+    console.error("Error eliminando el contacto:", error);
     res.status(500).json({ message: "Error en el servidor" });
   }
 };
@@ -241,10 +273,13 @@ export const searchContact = async (req: Request, res: Response) => {
           },
         },
       ]).exec();
-      revenueByContact = revenueAgg.reduce((acc: Record<string, number>, cur: any) => {
-        acc[String(cur._id)] = cur.totalRevenue || 0;
-        return acc;
-      }, {});
+      revenueByContact = revenueAgg.reduce(
+        (acc: Record<string, number>, cur: any) => {
+          acc[String(cur._id)] = cur.totalRevenue || 0;
+          return acc;
+        },
+        {}
+      );
     }
 
     const contactsWithRevenue = contacts.map((c: any) => ({
@@ -331,10 +366,13 @@ export const filterContacts = async (req: Request, res: Response) => {
           },
         },
       ]).exec();
-      revenueByContact = revenueAgg.reduce((acc: Record<string, number>, cur: any) => {
-        acc[String(cur._id)] = cur.totalRevenue || 0;
-        return acc;
-      }, {});
+      revenueByContact = revenueAgg.reduce(
+        (acc: Record<string, number>, cur: any) => {
+          acc[String(cur._id)] = cur.totalRevenue || 0;
+          return acc;
+        },
+        {}
+      );
     }
 
     const contactsWithRevenue = contacts.map((c: any) => ({

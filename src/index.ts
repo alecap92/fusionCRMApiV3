@@ -148,6 +148,14 @@ const configureRoutes = (app: Application): void => {
       path: "/api/v1/strategies",
       router: routes.strategyRouter,
     },
+    {
+      path: "/api/v1/conversation",
+      router: routes.conversationRouter,
+    },
+    {
+      path: "/api/v1/n8n",
+      router: routes.n8nRouter,
+    },
   ];
 
   // Rutas especiales (con o sin autenticación)
@@ -164,8 +172,7 @@ const configureRoutes = (app: Application): void => {
     { path: "/api/v1/files", router: routes.fileRouter },
     { path: "/api/v1/forms", router: routes.formRouter },
     { path: "/api/v1/email", router: routes.emailrouter },
-    { path: "/api/v1/contactsApi", router: routes.contactsApi },
-    { path: "/api/v1/dealsApi", router: routes.dealsApi },
+    { path: "/api", router: routes.apiRouter },
     { path: "/api/v1/download-deals", router: routes.downloadDealsRouter },
     {
       path: "/api/v1/documents",
@@ -174,10 +181,6 @@ const configureRoutes = (app: Application): void => {
     {
       path: "/api/v1/contact-files",
       router: routes.contactFilesRouter,
-    },
-    {
-      path: "/api/v1/conversation",
-      router: routes.conversationRouter,
     },
   ];
 

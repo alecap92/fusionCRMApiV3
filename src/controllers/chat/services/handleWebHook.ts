@@ -12,6 +12,7 @@ import ConversationPipelineModel from "../../../models/ConversationPipelineModel
 import { getSocketInstance } from "../../../config/socket";
 import UserModel from "../../../models/UserModel";
 import { reopenConversationIfClosed } from "../../../services/conversations/createConversation";
+import sendWhatsAppWebhook from "../../../services/n8n/whatsappWebhookService";
 
 export const handleWebhook = async (
   req: Request,
@@ -124,9 +125,11 @@ export const handleWebhook = async (
                 "application/pdf": "pdf",
                 "application/postscript": "ps",
                 "application/msword": "doc",
-                "application/vnd.openxmlformats-officedocument.wordprocessingml.document": "docx",
+                "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
+                  "docx",
                 "application/vnd.ms-excel": "xls",
-                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": "xlsx",
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet":
+                  "xlsx",
                 "text/plain": "txt",
                 "text/csv": "csv",
                 "image/jpeg": "jpg",
@@ -137,7 +140,7 @@ export const handleWebhook = async (
                 "audio/ogg": "ogg",
                 "application/zip": "zip",
               };
-              return map[mime] || (mime.split("/")[1] || "");
+              return map[mime] || mime.split("/")[1] || "";
             };
 
             const ensureExtension = (name: string, mime?: string): string => {
@@ -148,7 +151,10 @@ export const handleWebhook = async (
             };
 
             const baseFilename: string = mediaObject.filename || mediaObject.id;
-            const finalFilename = ensureExtension(baseFilename, mediaObject.mime_type);
+            const finalFilename = ensureExtension(
+              baseFilename,
+              mediaObject.mime_type
+            );
 
             awsUrl = await subirArchivo(
               mediaBuffer,
@@ -181,8 +187,9 @@ export const handleWebhook = async (
 
         // Crear conversación si no existe
         if (!conversation) {
-          const contactName = value.contacts?.[0]?.profile?.name || "Sin nombre";
-          
+          const contactName =
+            value.contacts?.[0]?.profile?.name || "Sin nombre";
+
           conversation = await ConversationModel.create({
             title: contactName,
             organization: organization,
@@ -266,7 +273,8 @@ export const handleWebhook = async (
 
           // Solo enviar si hay tokens válidos
           if (toTokens.length > 0) {
-            const contactName = value.contacts?.[0]?.profile?.name || "Sin nombre";
+            const contactName =
+              value.contacts?.[0]?.profile?.name || "Sin nombre";
             await sendNotification(toTokens, {
               title: contactName,
               body: text,
@@ -279,6 +287,20 @@ export const handleWebhook = async (
         } catch (error) {
           console.error("[PUSH] Error enviando notificación:", error);
         }
+
+        // Enviar webhook a N8N con todos los datos del mensaje
+        await sendWhatsAppWebhook({
+          message: text,
+          conversationId: conversation._id.toString(),
+          from,
+          to,
+          organizationId: organization._id.toString(),
+          timestamp: new Date(parseInt(timestamp) * 1000),
+          lastMessageTimestamp:
+            conversation.lastMessageTimestamp ||
+            new Date(parseInt(timestamp) * 1000),
+          whatsappData: req.body, // Enviar todo el objeto de WhatsApp
+        });
 
         emitNewNotification("whatsapp", organization._id, 1, from, {
           message: text,

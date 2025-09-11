@@ -28,25 +28,8 @@ const addMessage = (req, res) => __awaiter(void 0, void 0, void 0, function* () 
         const { conversationId } = req.params;
         const { from, to, message, mediaUrl, mediaId, type, direction, latitude, longitude, replyToMessage, messageId, filename, mimeType, } = req.body;
         // Validación y trazas mínimas
-        logger_1.default.info("[ADD_MESSAGE] Inicio solicitud", {
-            conversationId,
-            direction,
-            type,
-            hasMessage: Boolean(message && String(message).trim()),
-            hasMediaUrl: Boolean(mediaUrl),
-            hasMediaId: Boolean(mediaId),
-            to,
-            replyToMessage: replyToMessage || null,
-            messageId: messageId || null,
-            filename: filename || null,
-            mimeType: mimeType || null,
-        });
         const organizationId = ((_a = req === null || req === void 0 ? void 0 : req.user) === null || _a === void 0 ? void 0 : _a.organizationId) || (req === null || req === void 0 ? void 0 : req.organization);
         const userId = (_b = req.user) === null || _b === void 0 ? void 0 : _b._id;
-        logger_1.default.info("[ADD_MESSAGE] Contexto de seguridad", {
-            organizationId,
-            userId,
-        });
         // Validaciones básicas
         if (!to || !type || !direction) {
             logger_1.default.warn("[ADD_MESSAGE] Faltan campos requeridos", {
@@ -71,11 +54,6 @@ const addMessage = (req, res) => __awaiter(void 0, void 0, void 0, function* () 
             _id: conversationId,
             organization: organizationId,
         });
-        logger_1.default.info("[ADD_MESSAGE] Verificación de conversación", {
-            conversationId,
-            organizationId,
-            found: Boolean(conversation),
-        });
         if (!conversation) {
             logger_1.default.warn("[ADD_MESSAGE] Conversación no encontrada", {
                 conversationId,
@@ -88,9 +66,6 @@ const addMessage = (req, res) => __awaiter(void 0, void 0, void 0, function* () 
         }
         // Si es un mensaje entrante, verificar si la conversación debe reabrirse
         if (direction === "incoming") {
-            logger_1.default.info("[ADD_MESSAGE] Mensaje entrante: reabrir conversación si aplica", {
-                conversationId,
-            });
             yield (0, createConversation_1.reopenConversationIfClosed)(conversation);
         }
         // Verificar si ya existe un mensaje con el mismo messageId
@@ -115,9 +90,6 @@ const addMessage = (req, res) => __awaiter(void 0, void 0, void 0, function* () 
         let senderPhoneNumber;
         if (direction === "outgoing") {
             // Buscar integración de WhatsApp
-            logger_1.default.info("[ADD_MESSAGE] Mensaje saliente: consultando integración de WhatsApp", {
-                organizationId,
-            });
             const integration = yield IntegrationsModel_1.default.findOne({
                 organizationId: organizationId,
                 service: "whatsapp",
@@ -134,7 +106,8 @@ const addMessage = (req, res) => __awaiter(void 0, void 0, void 0, function* () 
             const apiUrl = process.env.WHATSAPP_API_URL;
             const phoneNumberId = (_c = integration.credentials) === null || _c === void 0 ? void 0 : _c.numberIdIdentifier;
             const accessToken = (_d = integration.credentials) === null || _d === void 0 ? void 0 : _d.accessToken;
-            senderPhoneNumber = ((_e = integration.credentials) === null || _e === void 0 ? void 0 : _e.phoneNumber) || undefined;
+            senderPhoneNumber =
+                ((_e = integration.credentials) === null || _e === void 0 ? void 0 : _e.phoneNumber) || undefined;
             if (!apiUrl || !phoneNumberId || !accessToken) {
                 logger_1.default.warn("[ADD_MESSAGE] Credenciales de WhatsApp incompletas", {
                     hasApiUrl: Boolean(apiUrl),
@@ -147,12 +120,6 @@ const addMessage = (req, res) => __awaiter(void 0, void 0, void 0, function* () 
                 });
             }
             const whatsappApiUrl = `${apiUrl}/${phoneNumberId}/messages`;
-            logger_1.default.info("[ADD_MESSAGE] Enviando a WhatsApp API", {
-                whatsappApiUrl,
-                type,
-                to,
-                hasMediaUrl: Boolean(mediaUrl),
-            });
             // Construir payload según el tipo
             let payload;
             try {
@@ -248,7 +215,9 @@ const addMessage = (req, res) => __awaiter(void 0, void 0, void 0, function* () 
             }
             catch (sendError) {
                 const status = ((_m = sendError === null || sendError === void 0 ? void 0 : sendError.response) === null || _m === void 0 ? void 0 : _m.status) || 500;
-                const details = ((_o = sendError === null || sendError === void 0 ? void 0 : sendError.response) === null || _o === void 0 ? void 0 : _o.data) || { message: sendError === null || sendError === void 0 ? void 0 : sendError.message };
+                const details = ((_o = sendError === null || sendError === void 0 ? void 0 : sendError.response) === null || _o === void 0 ? void 0 : _o.data) || {
+                    message: sendError === null || sendError === void 0 ? void 0 : sendError.message,
+                };
                 logger_1.default.error("[ADD_MESSAGE] Error al enviar mensaje a WhatsApp", {
                     status,
                     details,
@@ -263,11 +232,6 @@ const addMessage = (req, res) => __awaiter(void 0, void 0, void 0, function* () 
         // Crear el nuevo mensaje
         // Creando nuevo mensaje en la base de datos
         const effectiveFrom = from || senderPhoneNumber || (direction === "outgoing" ? to : to);
-        logger_1.default.info("[ADD_MESSAGE] Determinación del remitente (from)", {
-            providedFrom: from || null,
-            senderPhoneNumber: senderPhoneNumber || null,
-            effectiveFrom,
-        });
         const newMessage = new MessageModel_1.default({
             user: userId,
             organization: organizationId,
@@ -289,12 +253,6 @@ const addMessage = (req, res) => __awaiter(void 0, void 0, void 0, function* () 
             conversation: conversationId,
         });
         yield newMessage.save();
-        logger_1.default.info("[ADD_MESSAGE] Mensaje guardado", {
-            messageDbId: newMessage === null || newMessage === void 0 ? void 0 : newMessage._id,
-            conversationId,
-            direction,
-            type,
-        });
         // Actualizar la conversación con la referencia al último mensaje
         // Actualizando conversación con el nuevo mensaje
         conversation.lastMessage = newMessage._id;
@@ -318,11 +276,6 @@ const addMessage = (req, res) => __awaiter(void 0, void 0, void 0, function* () 
             console.warn("[ADD_MESSAGE] No se pudo enriquecer displayInfo:", e);
         }
         yield conversation.save();
-        logger_1.default.info("[ADD_MESSAGE] Conversación actualizada", {
-            conversationId: conversation._id,
-            lastMessageTimestamp: conversation.lastMessageTimestamp,
-            unreadCount: conversation.unreadCount,
-        });
         return res.status(201).json({
             success: true,
             data: {

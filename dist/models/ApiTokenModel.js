@@ -1,0 +1,102 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const mongoose_1 = require("mongoose");
+const ApiTokenSchema = new mongoose_1.Schema({
+    userId: {
+        type: mongoose_1.Schema.Types.ObjectId,
+        ref: "User",
+        required: true,
+        index: true,
+    },
+    organizationId: {
+        type: mongoose_1.Schema.Types.ObjectId,
+        ref: "Organization",
+        required: true,
+        index: true,
+    },
+    name: {
+        type: String,
+        required: true,
+        trim: true,
+        maxlength: 100,
+    },
+    description: {
+        type: String,
+        trim: true,
+        maxlength: 500,
+    },
+    tokenHash: {
+        type: String,
+        required: true,
+        unique: true,
+        index: true,
+    },
+    permissions: {
+        type: [String],
+        required: true,
+        validate: {
+            validator: function (permissions) {
+                return permissions.length > 0;
+            },
+            message: "Debe tener al menos un permiso",
+        },
+    },
+    isActive: {
+        type: Boolean,
+        default: true,
+        index: true,
+    },
+    lastUsedAt: {
+        type: Date,
+    },
+    expiresAt: {
+        type: Date,
+        index: true,
+    },
+    createdBy: {
+        type: mongoose_1.Schema.Types.ObjectId,
+        ref: "User",
+        required: true,
+    },
+}, {
+    timestamps: true,
+});
+// Índices compuestos para optimizar consultas
+ApiTokenSchema.index({ userId: 1, isActive: 1 });
+ApiTokenSchema.index({ organizationId: 1, isActive: 1 });
+ApiTokenSchema.index({ tokenHash: 1, isActive: 1 });
+// Middleware para eliminar tokens expirados automáticamente
+ApiTokenSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
+// Método para verificar si el token ha expirado
+ApiTokenSchema.methods.isExpired = function () {
+    if (!this.expiresAt)
+        return false;
+    return new Date() > this.expiresAt;
+};
+// Método para desactivar el token
+ApiTokenSchema.methods.deactivate = function () {
+    this.isActive = false;
+    return this.save();
+};
+// Método virtual para obtener información básica del token (sin hash)
+ApiTokenSchema.virtual("info").get(function () {
+    return {
+        id: this._id,
+        name: this.name,
+        description: this.description,
+        permissions: this.permissions,
+        isActive: this.isActive,
+        createdAt: this.createdAt,
+        lastUsedAt: this.lastUsedAt,
+        expiresAt: this.expiresAt,
+    };
+});
+// Configurar toJSON para excluir campos sensibles
+ApiTokenSchema.set("toJSON", {
+    virtuals: true,
+    transform: function (doc, ret) {
+        delete ret.tokenHash;
+        return ret;
+    },
+});
+exports.default = (0, mongoose_1.model)("ApiToken", ApiTokenSchema);

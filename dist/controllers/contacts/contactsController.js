@@ -12,7 +12,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.filterContacts = exports.searchContact = exports.updateContact = exports.deleteContact = exports.createContact = exports.getContacts = exports.getContact = void 0;
+exports.filterContacts = exports.searchContact = exports.updateContact = exports.deleteContactById = exports.deleteContact = exports.createContact = exports.getContacts = exports.getContact = void 0;
 const ContactModel_1 = __importDefault(require("../../models/ContactModel"));
 const DealsModel_1 = __importDefault(require("../../models/DealsModel"));
 // Obtener un solo contacto por ID
@@ -136,6 +136,33 @@ const deleteContact = (req, res) => __awaiter(void 0, void 0, void 0, function* 
     }
 });
 exports.deleteContact = deleteContact;
+// Eliminar un contacto individual
+const deleteContactById = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a;
+    const contactId = req.params.id;
+    const organizationId = (_a = req.user) === null || _a === void 0 ? void 0 : _a.organizationId;
+    if (!organizationId) {
+        return res.status(401).json({ message: "No autorizado" });
+    }
+    try {
+        const deletedContact = yield ContactModel_1.default.findOneAndDelete({
+            _id: contactId,
+            organizationId,
+        });
+        if (!deletedContact) {
+            return res.status(404).json({ message: "Contacto no encontrado" });
+        }
+        res.status(200).json({
+            message: "Contacto eliminado correctamente",
+            deletedContact,
+        });
+    }
+    catch (error) {
+        console.error("Error eliminando el contacto:", error);
+        res.status(500).json({ message: "Error en el servidor" });
+    }
+});
+exports.deleteContactById = deleteContactById;
 // Actualizar un contacto
 const updateContact = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const contactId = req.params.id;

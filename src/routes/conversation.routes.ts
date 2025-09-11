@@ -2,12 +2,10 @@ import { Router } from "express";
 import * as conversationController from "../controllers/conversation";
 import * as pipelineController from "../controllers/conversationPipeline";
 import * as automationController from "../controllers/conversation/automationController";
-import { verifyToken } from "../middlewares/authMiddleware";
 
 const router = Router();
 
-// Middleware para autenticación
-router.use(verifyToken);
+// La autenticación se maneja a nivel de rutas principales (index.ts)
 
 // Rutas para pipelines de conversación
 router.post("/pipelines", pipelineController.createPipeline);
