@@ -12,7 +12,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.createQuotationApi = exports.sendQuotationEmail = exports.printQuotation = exports.advancedFilterQuotations = exports.deleteQuotation = exports.updateQuotation = exports.createQuotation = exports.searchQuotation = exports.getQuotations = exports.getQuotation = void 0;
+exports.createQuotationApi = exports.sendQuotationEmail = exports.printQuotation = exports.advancedFilterQuotations = exports.deleteQuotation = exports.updateQuotation = exports.createQuotation = exports.getNextQuotationNumber = exports.searchQuotation = exports.getQuotations = exports.getQuotation = void 0;
 const QuotationModel_1 = __importDefault(require("../../models/QuotationModel"));
 const OrganizationModel_1 = __importDefault(require("../../models/OrganizationModel"));
 const printQuotationService_1 = require("../../services/quotation/printQuotationService");
@@ -132,6 +132,45 @@ const searchQuotation = (req, res) => __awaiter(void 0, void 0, void 0, function
     }
 });
 exports.searchQuotation = searchQuotation;
+// Get next quotation number (atomic operation)
+const getNextQuotationNumber = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a;
+    try {
+        const organizationId = (_a = req.user) === null || _a === void 0 ? void 0 : _a.organizationId;
+        if (!organizationId) {
+            return res.status(401).json({
+                message: "ID de organización no proporcionado",
+                code: "ORGANIZATION_ID_REQUIRED",
+            });
+        }
+        // Usar findOneAndUpdate con $inc para operación atómica
+        const organization = yield OrganizationModel_1.default.findOneAndUpdate({ _id: organizationId }, { $inc: { "settings.quotations.quotationNumber": 1 } }, {
+            new: true, // Retornar el documento actualizado
+            upsert: false, // No crear si no existe
+        });
+        if (!organization) {
+            return res.status(404).json({
+                message: "Organización no encontrada",
+                code: "ORGANIZATION_NOT_FOUND",
+            });
+        }
+        // El número actual ya está incrementado
+        const nextQuotationNumber = organization.settings.quotations.quotationNumber;
+        res.status(200).json({
+            quotationNumber: nextQuotationNumber,
+            message: "Número de cotización generado exitosamente",
+        });
+    }
+    catch (error) {
+        console.error("Error generando número de cotización:", error);
+        res.status(500).json({
+            message: "Error interno del servidor",
+            code: "INTERNAL_SERVER_ERROR",
+            error: process.env.NODE_ENV === "development" ? error : undefined,
+        });
+    }
+});
+exports.getNextQuotationNumber = getNextQuotationNumber;
 // Create a new quotation
 const createQuotation = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     var _a, _b;
@@ -168,12 +207,7 @@ const createQuotation = (req, res) => __awaiter(void 0, void 0, void 0, function
         };
         const newQuotation = new QuotationModel_1.default(formatedQuotation);
         yield newQuotation.save();
-        if (newQuotation) {
-            // increase quotation count
-            const number = yield OrganizationModel_1.default.findByIdAndUpdate(organizationId, {
-                $inc: { "settings.quotations.quotationNumber": 1 },
-            });
-        }
+        // Note: El número de cotización ya fue incrementado cuando se obtuvo vía /next-quotation-number
         res.status(201).json(newQuotation);
     }
     catch (err) {
@@ -324,6 +358,7 @@ const createQuotationApi = (req, res) => __awaiter(void 0, void 0, void 0, funct
           1. Validar el contacto este creado o crearlo.
           2. Inferir el numero de cotización desde la organización.
           3. El organizationId se obtiene del token de API autenticado.
+          4. El body recibe un array con formato específico de cliente y cotización.
         */
         // Obtener organizationId y userId del token de API
         const organizationId = (_a = req.apiUser) === null || _a === void 0 ? void 0 : _a.organizationId;
@@ -334,60 +369,163 @@ const createQuotationApi = (req, res) => __awaiter(void 0, void 0, void 0, funct
                 code: "INVALID_API_TOKEN",
             });
         }
-        const { contact, quotationNumber, items, expirationDate, lastModified, name, observaciones, paymentTerms, shippingTerms, status, subtotal, taxes, total, } = req.body;
-        if (!contact ||
-            !quotationNumber ||
-            !items ||
-            !expirationDate ||
-            !lastModified ||
-            !name ||
-            !observaciones ||
-            !paymentTerms ||
-            !shippingTerms ||
-            !status ||
-            !subtotal ||
-            !taxes ||
-            !total) {
-            return res.status(400).json({ message: "Faltan datos requeridos" });
+        console.log(req.body);
+        // Validar que el body sea un objeto válido
+        if (!req.body || typeof req.body !== "object" || Array.isArray(req.body)) {
+            return res.status(400).json({
+                message: "El body debe ser un objeto JSON válido",
+                code: "INVALID_BODY_FORMAT",
+            });
         }
-        const contactExists = yield ContactModel_1.default.findOne({
-            _id: contact,
-            organizationId,
-        });
-        if (!contactExists) {
-            return res.status(400).json({ message: "Contacto no encontrado" });
+        const quotationData = req.body; // El body ya es el objeto de cotización
+        const { Cliente, cotizacion, totals } = quotationData;
+        // Validar datos requeridos
+        if (!Cliente || !cotizacion || !totals) {
+            return res.status(400).json({
+                message: "Faltan datos requeridos: Cliente, cotizacion y totals son obligatorios",
+                code: "MISSING_REQUIRED_FIELDS",
+            });
         }
-        const quotationNumberExists = yield QuotationModel_1.default.findOne({
-            organizationId,
-            quotationNumber: Number(quotationNumber),
-        });
-        if (quotationNumberExists) {
-            return res
-                .status(400)
-                .json({ message: "Numero de cotizacion no disponible" });
+        if (!Cliente.Mobile || !Cliente.Nombre) {
+            return res.status(400).json({
+                message: "El cliente debe tener Mobile y Nombre",
+                code: "INVALID_CLIENT_DATA",
+            });
         }
-        const newQuotation = yield QuotationModel_1.default.create({
-            contactId: contactExists._id,
-            quotationNumber: Number(quotationNumber),
-            items,
-            expirationDate,
-            lastModified,
-            name,
-            observaciones,
-            paymentTerms,
-            shippingTerms,
-            status,
-            subtotal,
-            taxes,
-            total,
-            userId,
-            organizationId,
+        if (!Array.isArray(cotizacion) || cotizacion.length === 0) {
+            return res.status(400).json({
+                message: "La cotización debe tener al menos un item",
+                code: "EMPTY_QUOTATION_ITEMS",
+            });
+        }
+        // Obtener la organización y el número de cotización
+        const organization = yield OrganizationModel_1.default.findOne({
+            _id: organizationId,
         });
-        const quotation = yield QuotationModel_1.default.findById(newQuotation._id).populate("contactId");
-        res.status(200).json(quotation);
+        if (!organization) {
+            return res.status(400).json({
+                message: "Organización no encontrada",
+                code: "ORGANIZATION_NOT_FOUND",
+            });
+        }
+        // Obtener e incrementar el número de cotización de forma atómica
+        const updatedOrganization = yield OrganizationModel_1.default.findOneAndUpdate({ _id: organizationId }, { $inc: { "settings.quotations.quotationNumber": 1 } }, { new: true, upsert: false });
+        if (!updatedOrganization) {
+            return res.status(404).json({
+                message: "Organización no encontrada durante la actualización",
+                code: "ORGANIZATION_UPDATE_FAILED",
+            });
+        }
+        const currentQuotationNumber = updatedOrganization.settings.quotations.quotationNumber;
+        try {
+            // Validar si el contacto existe, si no, crearlo
+            let contactId;
+            const contactExists = yield ContactModel_1.default.findOne({
+                "properties.key": "mobile",
+                "properties.value": Cliente.Mobile,
+                organizationId,
+            });
+            if (contactExists) {
+                contactId = contactExists._id;
+                // Actualizar datos del contacto si han cambiado
+                const firstNameProp = contactExists.properties.find((p) => p.key === "firstName");
+                const lastNameProp = contactExists.properties.find((p) => p.key === "lastName");
+                const mobileProp = contactExists.properties.find((p) => p.key === "mobile");
+                const idNumberProp = contactExists.properties.find((p) => p.key === "idNumber");
+                const needsUpdate = (firstNameProp && firstNameProp.value !== Cliente.Nombre) ||
+                    (mobileProp && mobileProp.value !== Cliente.Mobile) ||
+                    (idNumberProp && idNumberProp.value !== Cliente.Nit);
+                if (needsUpdate) {
+                    // Actualizar properties específicas
+                    const updateData = {};
+                    if (firstNameProp && firstNameProp.value !== Cliente.Nombre) {
+                        updateData["properties.$.value"] = Cliente.Nombre;
+                        yield ContactModel_1.default.updateOne({ _id: contactExists._id, "properties.key": "firstName" }, { $set: updateData });
+                    }
+                    if (mobileProp && mobileProp.value !== Cliente.Mobile) {
+                        yield ContactModel_1.default.updateOne({ _id: contactExists._id, "properties.key": "mobile" }, { $set: { "properties.$.value": Cliente.Mobile } });
+                    }
+                    if (Cliente.Nit &&
+                        idNumberProp &&
+                        idNumberProp.value !== Cliente.Nit) {
+                        yield ContactModel_1.default.updateOne({ _id: contactExists._id, "properties.key": "idNumber" }, { $set: { "properties.$.value": Cliente.Nit } });
+                    }
+                }
+            }
+            else {
+                // Crear el contacto con properties
+                const properties = [
+                    { value: Cliente.Nombre || "", key: "firstName", isVisible: true },
+                    { value: "", key: "lastName", isVisible: true },
+                    { value: "", key: "position", isVisible: false },
+                    { value: "", key: "email", isVisible: false },
+                    { value: "", key: "phone", isVisible: true },
+                    { value: Cliente.Mobile, key: "mobile", isVisible: true },
+                    { value: "", key: "address", isVisible: false },
+                    { value: "", key: "city", isVisible: false },
+                    { value: "", key: "country", isVisible: false },
+                    { value: "", key: "comments", isVisible: false },
+                    { value: "NIT", key: "idType", isVisible: false },
+                    { value: Cliente.Nit || "", key: "idNumber", isVisible: false },
+                ];
+                const newContact = yield ContactModel_1.default.create({
+                    organizationId,
+                    properties,
+                });
+                contactId = newContact._id;
+            }
+            // Transformar los items de cotización al formato esperado por el modelo
+            const items = cotizacion.map((item) => ({
+                name: item.producto,
+                description: item.descripcion,
+                quantity: item.cantidad,
+                unitPrice: item.precio,
+                taxes: item.iva,
+                total: item.total,
+                imageUrl: item.imageUrl || item.imagen || "", // Soporte para imageUrl o imagen
+            }));
+            // Crear la cotización
+            const newQuotation = yield QuotationModel_1.default.create({
+                contactId,
+                quotationNumber: Number(currentQuotationNumber),
+                items,
+                optionalItems: [], // Inicializar array vacío
+                expirationDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 días por defecto
+                lastModified: new Date(),
+                name: `${currentQuotationNumber} - ${Cliente.Nombre}`, // Formato consistente con el ejemplo
+                observaciones: `Forma de pago: ${totals.forma_De_Pago}. Tiempo de entrega: ${totals.tiempo_de_entrega}`,
+                paymentTerms: totals.forma_De_Pago,
+                shippingTerms: totals.tiempo_de_entrega,
+                status: "draft",
+                subtotal: totals.subtotal,
+                taxes: totals.iva,
+                discounts: 0, // Por defecto sin descuentos
+                total: totals.total,
+                userId,
+                organizationId,
+            });
+            // Obtener la cotización creada con el contacto poblado
+            const quotation = yield QuotationModel_1.default.findById(newQuotation._id).populate("contactId");
+            res.status(201).json({
+                message: "Cotización creada exitosamente",
+                data: quotation,
+                quotationNumber: currentQuotationNumber,
+            });
+        }
+        catch (creationError) {
+            // Si hay error en la creación, revertir el incremento del número de cotización
+            yield OrganizationModel_1.default.findOneAndUpdate({ _id: organizationId }, { $inc: { "settings.quotations.quotationNumber": -1 } });
+            // Re-lanzar el error para que sea capturado por el catch principal
+            throw creationError;
+        }
     }
     catch (error) {
-        res.status(500).json({ message: "Server error", error });
+        console.error("Error creating quotation:", error);
+        res.status(500).json({
+            message: "Error interno del servidor",
+            code: "INTERNAL_SERVER_ERROR",
+            error: process.env.NODE_ENV === "development" ? error : undefined,
+        });
     }
 });
 exports.createQuotationApi = createQuotationApi;

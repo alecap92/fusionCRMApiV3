@@ -289,14 +289,39 @@ export const getConversationsKanban = async (
           .sort({ lastMessageTimestamp: -1 })
           .skip(skip)
           .limit(limitNumber)
-          .populate("lastMessage")
-          .populate("assignedTo", "firstName lastName email profilePicture");
+          .populate("assignedTo", "firstName lastName email profilePicture")
+          .lean();
 
         const total = await Conversation.countDocuments(stageQueryConditions);
         const pages = Math.ceil(total / limitNumber);
 
+        // Obtener los últimos mensajes reales usando agregación
+        const conversationIds = conversations.map((c: any) => c._id);
+        const lastMessagesAgg = await Message.aggregate([
+          { $match: { conversation: { $in: conversationIds } } },
+          { $sort: { timestamp: -1 } },
+          {
+            $group: {
+              _id: "$conversation",
+              doc: { $first: "$$ROOT" },
+            },
+          },
+        ]);
+
+        const lastMessagesByConversation: Record<string, any> = {};
+        for (const lm of lastMessagesAgg) {
+          lastMessagesByConversation[lm._id.toString()] = lm.doc;
+        }
+
         // Conversaciones en objetos plain
-        const conversationObjs = conversations.map((c: any) => c.toObject());
+        const conversationObjs = conversations.map((c: any) => {
+          const obj = { ...c };
+          const lastMessage = lastMessagesByConversation[c._id.toString()];
+          obj.lastMessage = lastMessage || null;
+          obj.lastMessageTimestamp =
+            lastMessage?.timestamp || c.lastMessageTimestamp;
+          return obj;
+        });
 
         // Batch de contactos por referencia
         const references: string[] = [

@@ -20,6 +20,9 @@ const OrganizationModel_1 = __importDefault(require("../models/OrganizationModel
 const ApiTokenModel_1 = __importDefault(require("../models/ApiTokenModel"));
 dotenv_1.default.config();
 const apiSecretKey = process.env.API_SECRET_KEY;
+if (!apiSecretKey) {
+    throw new Error("API_SECRET_KEY environment variable is required");
+}
 // Función para generar un token de API JWT
 const generateApiToken = (user, tokenName, expiresIn = "365d" // Por defecto 1 año para tokens de API
 ) => {
@@ -32,7 +35,7 @@ const generateApiToken = (user, tokenName, expiresIn = "365d" // Por defecto 1 a
         tokenName,
         type: "api",
     };
-    const token = jsonwebtoken_1.default.sign(payload, apiSecretKey, { expiresIn });
+    const token = jsonwebtoken_1.default.sign(payload, apiSecretKey);
     return token;
 };
 exports.generateApiToken = generateApiToken;

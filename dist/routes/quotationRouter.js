@@ -4,6 +4,7 @@ const express_1 = require("express");
 const quotationController_1 = require("../controllers/quotations/quotationController");
 const router = (0, express_1.Router)();
 router.get("/search", quotationController_1.searchQuotation); // Search for quotations based on a term
+router.get("/next-quotation-number", quotationController_1.getNextQuotationNumber); // Get next quotation number (atomic)
 router.get("/print/:id", quotationController_1.printQuotation);
 router.get("/:id", quotationController_1.getQuotation); // Get a single quotation by ID
 router.get("/", quotationController_1.getQuotations); // Get all quotations

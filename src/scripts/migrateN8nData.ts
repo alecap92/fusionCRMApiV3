@@ -1,6 +1,6 @@
 import mongoose from "mongoose";
-import N8nModel from "../models/n8nModel";
-import N8nAutomationModel from "../models/N8nAutomation";
+import N8nModel from "../models/N8nModel";
+import AutomationModel from "../models/AutomationModel";
 
 // Configuración de conexión a MongoDB
 const MONGODB_URI =
@@ -33,7 +33,7 @@ async function migrateN8nData() {
         console.log(`🔄 Migrando automatización: ${oldAutomation.name}`);
 
         // Crear nueva automatización con el modelo actualizado
-        const newAutomation = new N8nAutomationModel({
+        const newAutomation = new AutomationModel({
           name: oldAutomation.name,
           description: `Migrada desde modelo anterior - ${oldAutomation.name}`,
           category: "custom", // Categoría por defecto
@@ -92,7 +92,7 @@ async function migrateN8nData() {
         errorCount++;
         console.error(
           `❌ Error migrando automatización ${oldAutomation.name}:`,
-          error.message
+          (error as Error).message
         );
       }
     }
@@ -140,7 +140,7 @@ async function verifyMigration() {
     await mongoose.connect(MONGODB_URI);
 
     const oldCount = await N8nModel.countDocuments();
-    const newCount = await N8nAutomationModel.countDocuments();
+    const newCount = await AutomationModel.countDocuments();
 
     console.log(`📊 Modelo antiguo: ${oldCount} automatizaciones`);
     console.log(`📊 Modelo nuevo: ${newCount} automatizaciones`);
@@ -164,7 +164,7 @@ async function revertMigration() {
 
     await mongoose.connect(MONGODB_URI);
 
-    await N8nAutomationModel.deleteMany({ tags: { $in: ["migrated"] } });
+    await AutomationModel.deleteMany({ tags: { $in: ["migrated"] } });
 
     console.log("✅ Migración revertida");
   } catch (error) {

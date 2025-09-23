@@ -37,10 +37,8 @@ const express_1 = require("express");
 const conversationController = __importStar(require("../controllers/conversation"));
 const pipelineController = __importStar(require("../controllers/conversationPipeline"));
 const automationController = __importStar(require("../controllers/conversation/automationController"));
-const authMiddleware_1 = require("../middlewares/authMiddleware");
 const router = (0, express_1.Router)();
-// Middleware para autenticación
-router.use(authMiddleware_1.verifyToken);
+// La autenticación se maneja a nivel de rutas principales (index.ts)
 // Rutas para pipelines de conversación
 router.post("/pipelines", pipelineController.createPipeline);
 router.get("/pipelines", pipelineController.getPipelines);

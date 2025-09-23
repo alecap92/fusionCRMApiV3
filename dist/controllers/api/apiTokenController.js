@@ -93,7 +93,7 @@ const createApiToken = (req, res) => __awaiter(void 0, void 0, void 0, function*
             tokenId: apiToken._id.toString(),
             name: apiToken.name,
             permissions: apiToken.permissions,
-            expiresAt: apiToken.expiresAt,
+            expiresAt: apiToken.expiresAt || null,
             createdAt: apiToken.createdAt,
         };
         res.status(201).json({
@@ -265,7 +265,7 @@ const renewApiToken = (req, res) => __awaiter(void 0, void 0, void 0, function* 
             tokenId: newApiToken._id.toString(),
             name: newApiToken.name,
             permissions: newApiToken.permissions,
-            expiresAt: newApiToken.expiresAt,
+            expiresAt: newApiToken.expiresAt || null,
             createdAt: newApiToken.createdAt,
         };
         res.json({

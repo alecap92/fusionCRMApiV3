@@ -16,8 +16,8 @@ exports.migrateN8nData = migrateN8nData;
 exports.verifyMigration = verifyMigration;
 exports.revertMigration = revertMigration;
 const mongoose_1 = __importDefault(require("mongoose"));
-const n8nModel_1 = __importDefault(require("../models/n8nModel"));
-const N8nAutomation_1 = __importDefault(require("../models/N8nAutomation"));
+const N8nModel_1 = __importDefault(require("../models/N8nModel"));
+const AutomationModel_1 = __importDefault(require("../models/AutomationModel"));
 // Configuración de conexión a MongoDB
 const MONGODB_URI = process.env.MONGODB_URI || "mongodb://localhost:27017/fusioncol";
 function migrateN8nData() {
@@ -28,7 +28,7 @@ function migrateN8nData() {
             yield mongoose_1.default.connect(MONGODB_URI);
             console.log("✅ Conectado a MongoDB");
             // Obtener todas las automatizaciones del modelo antiguo
-            const oldAutomations = yield n8nModel_1.default.find({});
+            const oldAutomations = yield N8nModel_1.default.find({});
             console.log(`📊 Encontradas ${oldAutomations.length} automatizaciones para migrar`);
             if (oldAutomations.length === 0) {
                 console.log("ℹ️ No hay automatizaciones para migrar");
@@ -40,7 +40,7 @@ function migrateN8nData() {
                 try {
                     console.log(`🔄 Migrando automatización: ${oldAutomation.name}`);
                     // Crear nueva automatización con el modelo actualizado
-                    const newAutomation = new N8nAutomation_1.default({
+                    const newAutomation = new AutomationModel_1.default({
                         name: oldAutomation.name,
                         description: `Migrada desde modelo anterior - ${oldAutomation.name}`,
                         category: "custom", // Categoría por defecto
@@ -109,7 +109,7 @@ function migrateN8nData() {
                 const shouldDeleteOld = process.argv.includes("--delete-old");
                 if (shouldDeleteOld) {
                     console.log("\n🗑️ Eliminando datos antiguos...");
-                    yield n8nModel_1.default.deleteMany({});
+                    yield N8nModel_1.default.deleteMany({});
                     console.log("✅ Datos antiguos eliminados");
                 }
                 else {
@@ -136,8 +136,8 @@ function verifyMigration() {
         try {
             console.log("🔍 Verificando migración...");
             yield mongoose_1.default.connect(MONGODB_URI);
-            const oldCount = yield n8nModel_1.default.countDocuments();
-            const newCount = yield N8nAutomation_1.default.countDocuments();
+            const oldCount = yield N8nModel_1.default.countDocuments();
+            const newCount = yield AutomationModel_1.default.countDocuments();
             console.log(`📊 Modelo antiguo: ${oldCount} automatizaciones`);
             console.log(`📊 Modelo nuevo: ${newCount} automatizaciones`);
             if (newCount >= oldCount) {
@@ -161,7 +161,7 @@ function revertMigration() {
         try {
             console.log("🔄 Revirtiendo migración...");
             yield mongoose_1.default.connect(MONGODB_URI);
-            yield N8nAutomation_1.default.deleteMany({ tags: { $in: ["migrated"] } });
+            yield AutomationModel_1.default.deleteMany({ tags: { $in: ["migrated"] } });
             console.log("✅ Migración revertida");
         }
         catch (error) {

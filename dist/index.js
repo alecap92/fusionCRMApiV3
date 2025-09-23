@@ -144,6 +144,14 @@ const configureRoutes = (app) => {
             path: "/api/v1/strategies",
             router: routes_1.default.strategyRouter,
         },
+        {
+            path: "/api/v1/conversation",
+            router: routes_1.default.conversationRouter,
+        },
+        {
+            path: "/api/v1/n8n",
+            router: routes_1.default.n8nRouter,
+        },
     ];
     // Rutas especiales (con o sin autenticación)
     const specialRoutes = [
@@ -167,14 +175,6 @@ const configureRoutes = (app) => {
         {
             path: "/api/v1/contact-files",
             router: routes_1.default.contactFilesRouter,
-        },
-        {
-            path: "/api/v1/conversation",
-            router: routes_1.default.conversationRouter,
-        },
-        {
-            path: "/api/v1/n8n",
-            router: routes_1.default.n8nRouter,
         },
     ];
     // Registrar rutas protegidas

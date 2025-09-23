@@ -241,12 +241,35 @@ const getConversationsKanban = (req, res) => __awaiter(void 0, void 0, void 0, f
                     .sort({ lastMessageTimestamp: -1 })
                     .skip(skip)
                     .limit(limitNumber)
-                    .populate("lastMessage")
-                    .populate("assignedTo", "firstName lastName email profilePicture");
+                    .populate("assignedTo", "firstName lastName email profilePicture")
+                    .lean();
                 const total = yield ConversationModel_1.default.countDocuments(stageQueryConditions);
                 const pages = Math.ceil(total / limitNumber);
+                // Obtener los últimos mensajes reales usando agregación
+                const conversationIds = conversations.map((c) => c._id);
+                const lastMessagesAgg = yield MessageModel_1.default.aggregate([
+                    { $match: { conversation: { $in: conversationIds } } },
+                    { $sort: { timestamp: -1 } },
+                    {
+                        $group: {
+                            _id: "$conversation",
+                            doc: { $first: "$$ROOT" },
+                        },
+                    },
+                ]);
+                const lastMessagesByConversation = {};
+                for (const lm of lastMessagesAgg) {
+                    lastMessagesByConversation[lm._id.toString()] = lm.doc;
+                }
                 // Conversaciones en objetos plain
-                const conversationObjs = conversations.map((c) => c.toObject());
+                const conversationObjs = conversations.map((c) => {
+                    const obj = Object.assign({}, c);
+                    const lastMessage = lastMessagesByConversation[c._id.toString()];
+                    obj.lastMessage = lastMessage || null;
+                    obj.lastMessageTimestamp =
+                        (lastMessage === null || lastMessage === void 0 ? void 0 : lastMessage.timestamp) || c.lastMessageTimestamp;
+                    return obj;
+                });
                 // Batch de contactos por referencia
                 const references = [
                     ...new Set(conversationObjs
