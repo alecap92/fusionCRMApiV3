@@ -18,9 +18,12 @@ RUN apk add --no-cache \
     ttf-opensans \
     && rm -rf /var/cache/apk/*
 
+# Verificar que Chromium esté instalado correctamente
+RUN which chromium && chromium --version
+
 # Configurar Puppeteer para usar Chromium instalado
 ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true \
-    PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium-browser
+    PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
 
 # Copiar archivos de configuración de dependencias
 COPY package*.json ./

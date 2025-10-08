@@ -4,6 +4,7 @@ import ContactModel from "../../models/ContactModel";
 import ejs from "ejs";
 import path from "path";
 import puppeteer from "puppeteer";
+import puppeteerCore from "puppeteer-core";
 
 interface GeneratePdfOptions {
   headless?: boolean;
@@ -98,17 +99,47 @@ export const generateQuotationPdf = async (
         '--no-first-run',
         '--no-zygote',
         '--single-process',
-        '--disable-gpu'
+        '--disable-gpu',
+        '--disable-web-security',
+        '--disable-features=VizDisplayCompositor'
       ]
     };
 
-    // En producción, usar Chromium instalado en el sistema
-    if (process.env.NODE_ENV === 'production' && process.env.PUPPETEER_EXECUTABLE_PATH) {
-      puppeteerOptions.executablePath = process.env.PUPPETEER_EXECUTABLE_PATH;
+    // Configurar ruta del ejecutable de Chromium
+    if (process.env.NODE_ENV === 'production') {
+      // Intentar diferentes rutas posibles de Chromium
+      const possiblePaths = [
+        process.env.PUPPETEER_EXECUTABLE_PATH,
+        '/usr/bin/chromium',
+        '/usr/bin/chromium-browser',
+        '/usr/bin/google-chrome',
+        '/usr/bin/google-chrome-stable'
+      ].filter(Boolean);
+
+      for (const path of possiblePaths) {
+        try {
+          const fs = require('fs');
+          if (fs.existsSync(path)) {
+            puppeteerOptions.executablePath = path;
+            console.log(`Using Chromium at: ${path}`);
+            break;
+          }
+        } catch (error) {
+          console.warn(`Path ${path} not accessible:`, error);
+        }
+      }
+
+      // Si no se encontró ninguna ruta, usar configuración por defecto
+      if (!puppeteerOptions.executablePath) {
+        console.warn('No Chromium executable found, using default Puppeteer configuration');
+      }
     }
 
+    // Usar puppeteer-core en producción para mejor control
+    const puppeteerInstance = process.env.NODE_ENV === 'production' ? puppeteerCore : puppeteer;
+    
     // Iniciar puppeteer
-    const browser = await puppeteer.launch(puppeteerOptions);
+    const browser = await puppeteerInstance.launch(puppeteerOptions);
     const page = await browser.newPage();
 
     // Configurar y generar el PDF
