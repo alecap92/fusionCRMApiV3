@@ -87,11 +87,28 @@ export const generateQuotationPdf = async (
       footerText,
     });
 
-    // Iniciar puppeteer
-    const browser = await puppeteer.launch({ 
+    // Configuración de Puppeteer para producción
+    const puppeteerOptions: any = {
       headless: pdfOptions.headless,
-      args: ['--no-sandbox', '--disable-setuid-sandbox']
-    });
+      args: [
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-dev-shm-usage',
+        '--disable-accelerated-2d-canvas',
+        '--no-first-run',
+        '--no-zygote',
+        '--single-process',
+        '--disable-gpu'
+      ]
+    };
+
+    // En producción, usar Chromium instalado en el sistema
+    if (process.env.NODE_ENV === 'production' && process.env.PUPPETEER_EXECUTABLE_PATH) {
+      puppeteerOptions.executablePath = process.env.PUPPETEER_EXECUTABLE_PATH;
+    }
+
+    // Iniciar puppeteer
+    const browser = await puppeteer.launch(puppeteerOptions);
     const page = await browser.newPage();
 
     // Configurar y generar el PDF

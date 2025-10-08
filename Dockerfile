@@ -4,7 +4,7 @@ FROM node:18-alpine
 # Establecer directorio de trabajo
 WORKDIR /app
 
-# Instalar dependencias del sistema necesarias
+# Instalar dependencias del sistema necesarias para Puppeteer
 RUN apk add --no-cache \
     ffmpeg \
     chromium \
@@ -14,7 +14,13 @@ RUN apk add --no-cache \
     harfbuzz \
     ca-certificates \
     ttf-freefont \
+    udev \
+    ttf-opensans \
     && rm -rf /var/cache/apk/*
+
+# Configurar Puppeteer para usar Chromium instalado
+ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true \
+    PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium-browser
 
 # Copiar archivos de configuración de dependencias
 COPY package*.json ./

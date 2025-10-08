@@ -11,7 +11,8 @@
     "test:automation": "ts-node src/tests/automation-test.ts",
     "test:controller": "ts-node src/tests/controller-test.ts",
     "test:webhook": "ts-node src/tests/webhook-test.ts",
-    "migrate:emails": "ts-node src/scripts/migrateEmails.ts"
+    "migrate:emails": "ts-node src/scripts/migrateEmails.ts",
+    "postinstall": "npx puppeteer browsers install chrome || echo 'Chrome installation skipped - using system Chromium'"
   },
   "dependencies": {
     "@aws-sdk/client-dynamodb": "^3.782.0",
