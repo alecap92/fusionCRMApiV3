@@ -24,6 +24,8 @@ const createDeal = (req, res) => __awaiter(void 0, void 0, void 0, function* () 
     try {
         const { title, amount, contact, customFields } = req.body;
         const { pipeline, status, organizationId } = req.query;
+        console.log(req.body);
+        console.log(req.query);
         // Validación básica
         if (!title || !amount || !(contact === null || contact === void 0 ? void 0 : contact.mobile) || !organizationId) {
             return res.status(400).json({

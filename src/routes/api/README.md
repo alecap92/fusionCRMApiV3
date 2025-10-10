@@ -15,11 +15,17 @@ Esta carpeta contiene las rutas de la API organizadas de manera más limpia y es
 
 ### Contactos
 
+- `GET /api/contacts/search?phone={numero}&organizationId={id}` - Buscar contacto por teléfono
 - `POST /api/contacts` - Crear un nuevo contacto
 
 ### Deals
 
 - `POST /api/deals` - Crear un nuevo deal
+
+### Cotizaciones
+
+- `POST /api/quotations` - Crear una nueva cotización
+- `GET /api/quotations/:number/download` - Descargar cotización en PDF por número
 
 ## Migración
 

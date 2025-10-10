@@ -11,6 +11,9 @@ export const createDeal = async (req: Request, res: Response) => {
     const { title, amount, contact, customFields } = req.body;
     const { pipeline, status, organizationId } = req.query;
 
+    console.log(req.body);
+    console.log(req.query);
+
     // Validación básica
     if (!title || !amount || !contact?.mobile || !organizationId) {
       return res.status(400).json({

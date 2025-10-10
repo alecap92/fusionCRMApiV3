@@ -19,6 +19,7 @@ const ContactModel_1 = __importDefault(require("../../models/ContactModel"));
 const ejs_1 = __importDefault(require("ejs"));
 const path_1 = __importDefault(require("path"));
 const puppeteer_1 = __importDefault(require("puppeteer"));
+const puppeteer_core_1 = __importDefault(require("puppeteer-core"));
 /**
  * Genera un PDF de una cotización
  * @param quotationNumber - Número de la cotización a generar
@@ -70,11 +71,54 @@ const generateQuotationPdf = (quotationNumber, organizationId, options) => __awa
             logoUrl,
             footerText,
         });
-        // Iniciar puppeteer
-        const browser = yield puppeteer_1.default.launch({
+        // Configuración de Puppeteer para producción
+        const puppeteerOptions = {
             headless: pdfOptions.headless,
-            args: ['--no-sandbox', '--disable-setuid-sandbox']
-        });
+            args: [
+                '--no-sandbox',
+                '--disable-setuid-sandbox',
+                '--disable-dev-shm-usage',
+                '--disable-accelerated-2d-canvas',
+                '--no-first-run',
+                '--no-zygote',
+                '--single-process',
+                '--disable-gpu',
+                '--disable-web-security',
+                '--disable-features=VizDisplayCompositor'
+            ]
+        };
+        // Configurar ruta del ejecutable de Chromium
+        if (process.env.NODE_ENV === 'production') {
+            // Intentar diferentes rutas posibles de Chromium
+            const possiblePaths = [
+                process.env.PUPPETEER_EXECUTABLE_PATH,
+                '/usr/bin/chromium',
+                '/usr/bin/chromium-browser',
+                '/usr/bin/google-chrome',
+                '/usr/bin/google-chrome-stable'
+            ].filter(Boolean);
+            for (const path of possiblePaths) {
+                try {
+                    const fs = require('fs');
+                    if (fs.existsSync(path)) {
+                        puppeteerOptions.executablePath = path;
+                        console.log(`Using Chromium at: ${path}`);
+                        break;
+                    }
+                }
+                catch (error) {
+                    console.warn(`Path ${path} not accessible:`, error);
+                }
+            }
+            // Si no se encontró ninguna ruta, usar configuración por defecto
+            if (!puppeteerOptions.executablePath) {
+                console.warn('No Chromium executable found, using default Puppeteer configuration');
+            }
+        }
+        // Usar puppeteer-core en producción para mejor control
+        const puppeteerInstance = process.env.NODE_ENV === 'production' ? puppeteer_core_1.default : puppeteer_1.default;
+        // Iniciar puppeteer
+        const browser = yield puppeteerInstance.launch(puppeteerOptions);
         const page = yield browser.newPage();
         // Configurar y generar el PDF
         yield page.setContent(html, { waitUntil: "networkidle0" });
