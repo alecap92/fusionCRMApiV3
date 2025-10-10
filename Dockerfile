@@ -4,9 +4,8 @@ FROM node:18-alpine
 # Establecer directorio de trabajo
 WORKDIR /app
 
-# Instalar dependencias del sistema necesarias para Puppeteer
+# Instalar dependencias esenciales para Chromium
 RUN apk add --no-cache \
-    ffmpeg \
     chromium \
     nss \
     freetype \
@@ -14,8 +13,12 @@ RUN apk add --no-cache \
     harfbuzz \
     ca-certificates \
     ttf-freefont \
-    udev \
     ttf-opensans \
+    font-noto-emoji \
+    dbus \
+    xvfb \
+    udev \
+    ffmpeg \
     && rm -rf /var/cache/apk/*
 
 # Verificar que Chromium esté instalado correctamente
@@ -42,6 +45,11 @@ RUN npm run build
 # Crear usuario no-root para seguridad
 RUN addgroup -g 1001 -S nodejs
 RUN adduser -S nodejs -u 1001
+
+# Dar permisos al usuario nodejs para usar Chromium
+RUN mkdir -p /home/nodejs/.cache && \
+    chown -R nodejs:nodejs /home/nodejs && \
+    chmod -R 755 /home/nodejs
 
 # Cambiar propiedad de archivos al usuario nodejs
 RUN chown -R nodejs:nodejs /app

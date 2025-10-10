@@ -12,6 +12,9 @@ services:
       - mongo
       - redis
     restart: unless-stopped
+    shm_size: "2gb" # Aumentar memoria compartida para Chromium
+    cap_add:
+      - SYS_ADMIN # Necesario para sandbox de Chromium
     networks:
       - fusioncol-network
 

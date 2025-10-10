@@ -13,15 +13,18 @@ services:
       # - MONGODB_URI=mongodb+srv://user:pass@cluster.mongodb.net/fusioncol
       # - REDIS_URL=redis://user:pass@redis-host:6379
     restart: unless-stopped
+    shm_size: "2gb" # Aumentar memoria compartida para Chromium
+    cap_add:
+      - SYS_ADMIN # Necesario para sandbox de Chromium
     # Configuración para producción
     deploy:
       resources:
         limits:
+          memory: 2G # Aumentar memoria para Chromium
+          cpus: "1.0" # Aumentar CPU para Chromium
+        reservations:
           memory: 1G
           cpus: "0.5"
-        reservations:
-          memory: 512M
-          cpus: "0.25"
     # Health check
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
