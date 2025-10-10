@@ -42,6 +42,9 @@ COPY public/ ./public/
 # Compilar TypeScript
 RUN npm run build
 
+# Asegurar que el archivo de plantilla esté en el lugar correcto
+RUN mkdir -p dist/PDF && cp src/PDF/quotation.ejs dist/PDF/ && echo "Template file copied to dist/PDF/" && ls -la dist/PDF/
+
 # Crear usuario no-root para seguridad
 RUN addgroup -g 1001 -S nodejs
 RUN adduser -S nodejs -u 1001

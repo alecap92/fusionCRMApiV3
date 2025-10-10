@@ -6,13 +6,14 @@
   "scripts": {
     "start": "node dist/index.js",
     "dev": "nodemon src/index.ts",
-    "build": "tsc && mkdir -p dist/PDF && cp -r src/PDF/quotation.ejs dist/PDF/ && [ -d src/PDF/fonts ] && cp -r src/PDF/fonts dist/PDF/ || echo 'No fonts directory found'",
+    "build": "tsc && mkdir -p dist/PDF && cp src/PDF/quotation.ejs dist/PDF/ && [ -d src/PDF/fonts ] && cp -r src/PDF/fonts dist/PDF/ || echo 'No fonts directory found' && echo 'Build completed - checking files:' && ls -la dist/PDF/",
     "fmt": "prettier --write \"./src/**/*.{ts,tsx,js,json}\"",
     "test:automation": "ts-node src/tests/automation-test.ts",
     "test:controller": "ts-node src/tests/controller-test.ts",
     "test:webhook": "ts-node src/tests/webhook-test.ts",
     "migrate:emails": "ts-node src/scripts/migrateEmails.ts",
-    "postinstall": "npx puppeteer browsers install chrome || echo 'Chrome installation skipped - using system Chromium'"
+    "postinstall": "npx puppeteer browsers install chrome || echo 'Chrome installation skipped - using system Chromium'",
+    "postbuild": "mkdir -p dist/PDF && cp src/PDF/quotation.ejs dist/PDF/ && echo 'Template file copied successfully'"
   },
   "dependencies": {
     "@aws-sdk/client-dynamodb": "^3.782.0",

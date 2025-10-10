@@ -86,6 +86,25 @@ export const generateQuotationPdf = async (
         : "src/PDF/quotation.ejs"
     );
 
+    // Verificar que el archivo de plantilla existe
+    const fs = require("fs");
+    if (!fs.existsSync(templatePath)) {
+      console.error(`Template file not found at: ${templatePath}`);
+      console.log(
+        "Available files in dist/PDF:",
+        fs.existsSync("dist/PDF")
+          ? fs.readdirSync("dist/PDF")
+          : "dist/PDF does not exist"
+      );
+      console.log(
+        "Available files in src/PDF:",
+        fs.existsSync("src/PDF")
+          ? fs.readdirSync("src/PDF")
+          : "src/PDF does not exist"
+      );
+      throw new Error(`Template file not found: ${templatePath}`);
+    }
+
     // Renderizar la plantilla HTML
     const html = await ejs.renderFile(templatePath, {
       quotation: quotationWithContactData,
@@ -115,6 +134,23 @@ export const generateQuotationPdf = async (
         "--metrics-recording-only",
         "--mute-audio",
         "--safebrowsing-disable-auto-update",
+        "--disable-background-timer-throttling",
+        "--disable-backgrounding-occluded-windows",
+        "--disable-renderer-backgrounding",
+        "--disable-features=TranslateUI",
+        "--disable-ipc-flooding-protection",
+        "--memory-pressure-off",
+        "--max_old_space_size=4096",
+        "--enable-features=NetworkService",
+        "--disable-features=VizDisplayCompositor",
+        "--disable-background-networking",
+        "--disable-default-apps",
+        "--disable-sync",
+        "--disable-translate",
+        "--hide-scrollbars",
+        "--mute-audio",
+        "--no-first-run",
+        "--disable-extensions",
         "--disable-background-timer-throttling",
         "--disable-backgrounding-occluded-windows",
         "--disable-renderer-backgrounding",
@@ -167,7 +203,7 @@ export const generateQuotationPdf = async (
     let browser: any = null;
     let retryCount = 0;
     const maxRetries = 3;
-    let pdfBuffer: Buffer;
+    let pdfBuffer: Buffer | undefined;
 
     while (retryCount < maxRetries) {
       try {
@@ -188,6 +224,42 @@ export const generateQuotationPdf = async (
           waitUntil: "networkidle0",
           timeout: 30000,
         });
+
+        // Esperar a que las imágenes se carguen completamente con mejor manejo
+        try {
+          await page.waitForFunction(
+            () => {
+              const images = document.querySelectorAll("img");
+              if (images.length === 0) return true;
+
+              return Array.from(images).every((img) => {
+                return (
+                  img.complete &&
+                  img.naturalHeight !== 0 &&
+                  img.naturalWidth !== 0
+                );
+              });
+            },
+            { timeout: 15000 }
+          );
+          console.log("Todas las imágenes cargadas correctamente");
+        } catch (error) {
+          console.warn(
+            "Algunas imágenes no se cargaron completamente, continuando..."
+          );
+          // Intentar cargar imágenes que fallaron
+          await page.evaluate(() => {
+            const images = document.querySelectorAll("img");
+            images.forEach((img) => {
+              if (!img.complete || img.naturalHeight === 0) {
+                img.src = img.src; // Forzar recarga
+              }
+            });
+          });
+          // Esperar un poco más para que se recarguen
+          await new Promise((resolve) => setTimeout(resolve, 2000));
+        }
+
         await page.emulateMediaType("screen");
 
         pdfBuffer = await page.pdf({
@@ -226,6 +298,13 @@ export const generateQuotationPdf = async (
         // Esperar un poco antes del siguiente intento
         await new Promise((resolve) => setTimeout(resolve, 1000 * retryCount));
       }
+    }
+
+    // Verificar que el PDF se generó correctamente
+    if (!pdfBuffer) {
+      throw new Error(
+        "No se pudo generar el PDF después de todos los intentos"
+      );
     }
 
     // Devolver el buffer del PDF y los datos utilizados
