@@ -47,8 +47,15 @@ const updatePipeline = (req, res) => __awaiter(void 0, void 0, void 0, function*
         }
         // Si hay nuevas etapas, actualizarlas
         if (stages && Array.isArray(stages)) {
-            // Guardar las etapas existentes para mapeo
+            // Guardar las etapas existentes para mapeo de orders
             const existingStages = [...pipeline.stages];
+            // Crear un mapa de _id a order ANTERIOR
+            const oldOrderMap = new Map();
+            existingStages.forEach((stage) => {
+                if (stage._id) {
+                    oldOrderMap.set(stage._id.toString(), stage.order);
+                }
+            });
             // Actualizar las etapas
             pipeline.stages = stages.map((stage, index) => ({
                 name: stage.name,
@@ -56,7 +63,28 @@ const updatePipeline = (req, res) => __awaiter(void 0, void 0, void 0, function*
                 color: stage.color || "#808080",
                 autoAssign: stage.autoAssign || false,
                 assignToTeam: stage.assignToTeam || null,
+                _id: stage._id, // Mantener el _id si existe
             }));
+            // Crear mapa de _id a order NUEVO
+            const newOrderMap = new Map();
+            pipeline.stages.forEach((stage) => {
+                if (stage._id) {
+                    newOrderMap.set(stage._id.toString(), stage.order);
+                }
+            });
+            // Detectar cambios de order en etapas existentes
+            // y actualizar las conversaciones afectadas
+            for (const [stageId, oldOrder] of oldOrderMap.entries()) {
+                const newOrder = newOrderMap.get(stageId);
+                if (newOrder !== undefined && newOrder !== oldOrder) {
+                    // El order de esta etapa cambió, actualizar las conversaciones
+                    yield ConversationModel_1.default.updateMany({
+                        pipeline: id,
+                        currentStage: oldOrder,
+                    }, { currentStage: newOrder });
+                    console.log(`Conversaciones actualizadas: stage ${stageId} order ${oldOrder} -> ${newOrder}`);
+                }
+            }
             // Si se eliminaron etapas, actualizar las conversaciones afectadas
             if (existingStages.length > pipeline.stages.length) {
                 // Obtenemos el máximo orden de las nuevas etapas

@@ -20,6 +20,48 @@ const ejs_1 = __importDefault(require("ejs"));
 const path_1 = __importDefault(require("path"));
 const puppeteer_1 = __importDefault(require("puppeteer"));
 const puppeteer_core_1 = __importDefault(require("puppeteer-core"));
+const axios_1 = __importDefault(require("axios"));
+/**
+ * Convierte una URL de imagen a base64
+ * @param imageUrl - URL de la imagen
+ * @param timeout - Timeout en milisegundos (por defecto 5000ms)
+ * @returns Base64 string o null si falla
+ */
+const imageUrlToBase64 = (imageUrl_1, ...args_1) => __awaiter(void 0, [imageUrl_1, ...args_1], void 0, function* (imageUrl, timeout = 5000) {
+    try {
+        if (!imageUrl || imageUrl.trim() === "") {
+            return null;
+        }
+        const response = yield axios_1.default.get(imageUrl, {
+            responseType: "arraybuffer",
+            timeout,
+            headers: {
+                "User-Agent": "Mozilla/5.0",
+            },
+        });
+        // Detectar el tipo de contenido
+        const contentType = response.headers["content-type"] || "image/jpeg";
+        const base64 = Buffer.from(response.data, "binary").toString("base64");
+        return `data:${contentType};base64,${base64}`;
+    }
+    catch (error) {
+        console.warn(`[PDF] Error convirtiendo imagen a base64 (${imageUrl}):`, error.message);
+        return null;
+    }
+});
+/**
+ * Carga múltiples imágenes en paralelo y las convierte a base64
+ * @param imageUrls - Array de URLs de imágenes
+ * @returns Array de base64 strings (null para las que fallaron)
+ */
+const loadImagesInParallel = (imageUrls) => __awaiter(void 0, void 0, void 0, function* () {
+    console.log(`[PDF] Cargando ${imageUrls.length} imágenes en paralelo...`);
+    const startTime = Date.now();
+    const promises = imageUrls.map((url) => imageUrlToBase64(url));
+    const results = yield Promise.all(promises);
+    console.log(`[PDF] ${results.filter((r) => r !== null).length}/${imageUrls.length} imágenes cargadas en ${Date.now() - startTime}ms`);
+    return results;
+});
 // Cache del navegador para reutilizarlo entre peticiones
 let browserInstance = null;
 let browserInitializing = false;
@@ -145,7 +187,7 @@ function getBrowserInstance() {
  * @returns Un objeto con el buffer del PDF y los datos utilizados
  */
 const generateQuotationPdf = (quotationNumber, organizationId, options) => __awaiter(void 0, void 0, void 0, function* () {
-    var _a;
+    var _a, _b, _c;
     const startTime = Date.now();
     console.log(`[PDF] Iniciando generación de PDF para cotización ${quotationNumber}`);
     try {
@@ -188,6 +230,46 @@ const generateQuotationPdf = (quotationNumber, organizationId, options) => __awa
         console.log(`[PDF] Contacto obtenido en ${Date.now() - startTime}ms`);
         // Asignar los datos de contacto a la cotización
         const quotationWithContactData = Object.assign(Object.assign({}, quotation), { contactId: contactData });
+        // Pre-cargar todas las imágenes en paralelo
+        console.log(`[PDF] Pre-cargando imágenes...`);
+        const imageLoadStart = Date.now();
+        // Recopilar todas las URLs de imágenes
+        const imageUrls = [];
+        const imageMap = {};
+        // Logo de la organización
+        if (logoUrl) {
+            imageMap["logo"] = imageUrls.length;
+            imageUrls.push(logoUrl);
+        }
+        // Imagen de fondo
+        const bgImageUrl = "https://fusioncrmbucket.s3.us-east-1.amazonaws.com/bg.jpg";
+        imageMap["background"] = imageUrls.length;
+        imageUrls.push(bgImageUrl);
+        // Imágenes de productos
+        const itemImageMap = {};
+        (_b = quotationWithContactData.items) === null || _b === void 0 ? void 0 : _b.forEach((item, index) => {
+            if (item.imageUrl) {
+                itemImageMap[index] = imageUrls.length;
+                imageUrls.push(item.imageUrl);
+            }
+        });
+        // Cargar todas las imágenes en paralelo
+        const base64Images = yield loadImagesInParallel(imageUrls);
+        // Asignar las imágenes base64 a los objetos correspondientes
+        const logoBase64 = imageMap["logo"] !== undefined ? base64Images[imageMap["logo"]] : null;
+        const bgBase64 = imageMap["background"] !== undefined
+            ? base64Images[imageMap["background"]]
+            : null;
+        // Asignar imágenes base64 a los items
+        const itemsWithBase64Images = (_c = quotationWithContactData.items) === null || _c === void 0 ? void 0 : _c.map((item, index) => {
+            if (itemImageMap[index] !== undefined) {
+                return Object.assign(Object.assign({}, item), { imageBase64: base64Images[itemImageMap[index]] ||
+                        "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHJlY3Qgd2lkdGg9IjYwIiBoZWlnaHQ9IjYwIiBmaWxsPSIjZjBmMGYwIi8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtc2l6ZT0iMTAiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGR5PSIuM2VtIiBmaWxsPSIjOTk5Ij5TaW4gaW1hZ2VuPC90ZXh0Pjwvc3ZnPg==" });
+            }
+            return Object.assign(Object.assign({}, item), { imageBase64: "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHJlY3Qgd2lkdGg9IjYwIiBoZWlnaHQ9IjYwIiBmaWxsPSIjZjBmMGYwIi8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtc2l6ZT0iMTAiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGR5PSIuM2VtIiBmaWxsPSIjOTk5Ij5TaW4gaW1hZ2VuPC90ZXh0Pjwvc3ZnPg==" });
+        });
+        const quotationWithImages = Object.assign(Object.assign({}, quotationWithContactData), { items: itemsWithBase64Images });
+        console.log(`[PDF] Imágenes pre-cargadas en ${Date.now() - imageLoadStart}ms`);
         // Ruta a la plantilla EJS
         const templatePath = path_1.default.resolve(process.cwd(), process.env.NODE_ENV === "production"
             ? "dist/PDF/quotation.ejs"
@@ -198,11 +280,12 @@ const generateQuotationPdf = (quotationNumber, organizationId, options) => __awa
             console.error(`Template file not found at: ${templatePath}`);
             throw new Error(`Template file not found: ${templatePath}`);
         }
-        // Renderizar la plantilla HTML
+        // Renderizar la plantilla HTML con imágenes en base64
         console.log(`[PDF] Renderizando plantilla HTML...`);
         const html = yield ejs_1.default.renderFile(templatePath, {
-            quotation: quotationWithContactData,
-            logoUrl,
+            quotation: quotationWithImages,
+            logoBase64: logoBase64 || logoUrl, // Fallback a URL si falla la conversión
+            bgBase64: bgBase64,
             footerText,
         });
         console.log(`[PDF] HTML renderizado en ${Date.now() - startTime}ms`);
@@ -214,42 +297,26 @@ const generateQuotationPdf = (quotationNumber, organizationId, options) => __awa
         console.log(`[PDF] Creando nueva página...`);
         const page = yield browser.newPage();
         try {
-            // Configurar timeouts de página (reducidos)
-            page.setDefaultTimeout(20000); // 20 segundos
-            page.setDefaultNavigationTimeout(20000);
+            // Configurar timeouts de página
+            page.setDefaultTimeout(10000); // 10 segundos (reducido)
+            page.setDefaultNavigationTimeout(10000);
             // Configurar y generar el PDF
             console.log(`[PDF] Cargando contenido HTML en la página...`);
             yield page.setContent(html, {
-                waitUntil: "domcontentloaded", // Cambiado de networkidle0 para ser más rápido
-                timeout: 15000, // Reducido a 15 segundos
+                waitUntil: "domcontentloaded", // No esperar recursos de red ya que todo está en base64
+                timeout: 8000, // 8 segundos
             });
             console.log(`[PDF] Contenido HTML cargado en ${Date.now() - startTime}ms`);
-            // Esperar a que las imágenes se carguen (timeout más corto)
-            try {
-                console.log(`[PDF] Esperando carga de imágenes...`);
-                yield page.waitForFunction(() => {
-                    const images = document.querySelectorAll("img");
-                    if (images.length === 0)
-                        return true;
-                    return Array.from(images).every((img) => {
-                        return (img.complete &&
-                            img.naturalHeight !== 0 &&
-                            img.naturalWidth !== 0);
-                    });
-                }, { timeout: 8000 } // Reducido a 8 segundos
-                );
-                console.log(`[PDF] Imágenes cargadas en ${Date.now() - startTime}ms`);
-            }
-            catch (error) {
-                console.warn(`[PDF] Algunas imágenes no se cargaron completamente (${Date.now() - startTime}ms), continuando...`);
-            }
+            // Ya no necesitamos esperar imágenes porque están todas embebidas en base64
+            // Pequeña espera para asegurar que el DOM se haya renderizado
+            yield page.waitForTimeout(500);
             yield page.emulateMediaType("screen");
             console.log(`[PDF] Generando PDF...`);
             const pdfBuffer = yield page.pdf({
                 format: pdfOptions.format,
                 printBackground: true,
                 margin: pdfOptions.margin,
-                timeout: 15000, // Reducido a 15 segundos
+                timeout: 10000, // 10 segundos
             });
             console.log(`[PDF] PDF generado exitosamente en ${Date.now() - startTime}ms`);
             // Cerrar la página (no el navegador, para reutilizarlo)
