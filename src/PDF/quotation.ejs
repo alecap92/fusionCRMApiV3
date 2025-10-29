@@ -10,7 +10,9 @@
         font-size: 12px;
         color: #1F2937;
         font-family: 'Inter', sans-serif;
-        background-image: url('https://fusioncrmbucket.s3.us-east-1.amazonaws.com/bg.jpg');
+        <% if (bgBase64) { %>
+        background-image: url('<%= bgBase64 %>');
+        <% } %>
         background-size: contain ;
         background-position: center;
         background-repeat: no-repeat;
@@ -23,7 +25,9 @@
   <body class="text-gray-800">
     <!-- Header -->
     <div class="flex justify-between items-center border-b pb-4 mb-6">
-      <img src="<%= logoUrl %>" class="w-36 object-contain" />
+      <% if (logoBase64) { %>
+      <img src="<%= logoBase64 %>" class="w-36 object-contain" />
+      <% } %>
       <div class="text-right">
         <h1 class="text-2xl font-extrabold text-blue-800 tracking-wide">Cotización CO<%= quotation.quotationNumber %></h1>
         <p class="text-sm text-gray-600">Fecha: <%= new Date(quotation.creationDate).toLocaleDateString() %></p>
@@ -55,11 +59,10 @@
       <tbody class="divide-y divide-gray-200">
         <% quotation.items.forEach(item => { %>
           <tr>
-            <% console.log('Image URL:', item.imageUrl); %>
             <td class="px-3 py-2">
               <div class="flex gap-3 items-start">
                 <img
-                  src="<%= item.imageUrl || 'https://via.placeholder.com/60?text=Sin+Imagen' %>"
+                  src="<%= item.imageBase64 %>"
                   class="w-16 h-16 object-contain border rounded"
                 />
                 <div>
