@@ -81,35 +81,13 @@ let browserInstance: any = null;
 let browserInitializing = false;
 
 /**
- * Obtiene una instancia del navegador (reutiliza si existe, crea nueva si no)
+ * Obtiene una instancia del navegador (crea una nueva por cada request)
+ * NOTA: Temporalmente deshabilitada la reutilización para evitar problemas de concurrencia
  */
 async function getBrowserInstance(): Promise<any> {
-  // Si ya tenemos una instancia activa, verificar que esté conectada
-  if (browserInstance) {
-    try {
-      // Verificar que el navegador sigue activo
-      await browserInstance.version();
-      console.log("Reutilizando instancia de navegador existente");
-      return browserInstance;
-    } catch (error) {
-      console.log("Instancia de navegador no válida, creando nueva...");
-      browserInstance = null;
-    }
-  }
-
-  // Evitar inicializaciones concurrentes
-  if (browserInitializing) {
-    console.log("Esperando inicialización de navegador en curso...");
-    // Esperar hasta 10 segundos por la inicialización
-    for (let i = 0; i < 40; i++) {
-      await new Promise((resolve) => setTimeout(resolve, 250));
-      if (browserInstance) {
-        return browserInstance;
-      }
-    }
-    throw new Error("Timeout esperando inicialización de navegador");
-  }
-
+  // Siempre crear una nueva instancia para evitar problemas de concurrencia
+  console.log("Creando nueva instancia de navegador (sin reutilización)...");
+  
   browserInitializing = true;
 
   try {
@@ -132,6 +110,7 @@ async function getBrowserInstance(): Promise<any> {
         "--mute-audio",
       ],
       timeout: 60000, // 60 segundos para inicializar
+      protocolTimeout: 120000, // 120 segundos para operaciones del protocolo
     };
 
     // Configurar ruta del ejecutable de Chromium en producción
@@ -167,39 +146,12 @@ async function getBrowserInstance(): Promise<any> {
     const puppeteerInstance =
       process.env.NODE_ENV === "production" ? puppeteerCore : puppeteer;
 
-    browserInstance = await puppeteerInstance.launch(puppeteerOptions);
+    const newBrowser = await puppeteerInstance.launch(puppeteerOptions);
 
     const initTime = Date.now() - startTime;
     console.log(`Navegador inicializado en ${initTime}ms`);
 
-    // Cerrar el navegador después de 5 minutos de inactividad
-    const inactivityTimeout = 5 * 60 * 1000; // 5 minutos
-    let inactivityTimer: NodeJS.Timeout;
-
-    const resetInactivityTimer = () => {
-      if (inactivityTimer) clearTimeout(inactivityTimer);
-      inactivityTimer = setTimeout(async () => {
-        if (browserInstance) {
-          console.log("Cerrando navegador por inactividad");
-          try {
-            await browserInstance.close();
-          } catch (error) {
-            console.warn("Error cerrando navegador por inactividad:", error);
-          }
-          browserInstance = null;
-        }
-      }, inactivityTimeout);
-    };
-
-    resetInactivityTimer();
-
-    browserInstance.on("disconnected", () => {
-      console.log("Navegador desconectado");
-      browserInstance = null;
-      if (inactivityTimer) clearTimeout(inactivityTimer);
-    });
-
-    return browserInstance;
+    return newBrowser;
   } finally {
     browserInitializing = false;
   }
@@ -381,14 +333,14 @@ export const generateQuotationPdf = async (
 
     try {
       // Configurar timeouts de página
-      page.setDefaultTimeout(10000); // 10 segundos (reducido)
-      page.setDefaultNavigationTimeout(10000);
+      page.setDefaultTimeout(30000); // 30 segundos
+      page.setDefaultNavigationTimeout(30000);
 
       // Configurar y generar el PDF
       console.log(`[PDF] Cargando contenido HTML en la página...`);
       await page.setContent(html, {
         waitUntil: "domcontentloaded", // No esperar recursos de red ya que todo está en base64
-        timeout: 8000, // 8 segundos
+        timeout: 20000, // 20 segundos
       });
       console.log(
         `[PDF] Contenido HTML cargado en ${Date.now() - startTime}ms`
@@ -396,7 +348,7 @@ export const generateQuotationPdf = async (
 
       // Ya no necesitamos esperar imágenes porque están todas embebidas en base64
       // Pequeña espera para asegurar que el DOM se haya renderizado
-      await page.waitForTimeout(500);
+      await new Promise(resolve => setTimeout(resolve, 500));
 
       await page.emulateMediaType("screen");
 
@@ -405,14 +357,22 @@ export const generateQuotationPdf = async (
         format: pdfOptions.format as any,
         printBackground: true,
         margin: pdfOptions.margin,
-        timeout: 10000, // 10 segundos
+        timeout: 30000, // 30 segundos
       });
       console.log(
         `[PDF] PDF generado exitosamente en ${Date.now() - startTime}ms`
       );
 
-      // Cerrar la página (no el navegador, para reutilizarlo)
+      // Cerrar la página
       await page.close();
+      
+      // Cerrar el navegador (ya no reutilizamos)
+      console.log("[PDF] Cerrando navegador...");
+      try {
+        await browser.close();
+      } catch (closeBrowserError) {
+        console.warn("[PDF] Error cerrando navegador:", closeBrowserError);
+      }
 
       // Devolver el buffer del PDF y los datos utilizados
       return {
@@ -422,11 +382,16 @@ export const generateQuotationPdf = async (
         footerText,
       };
     } catch (error) {
-      // Asegurar que la página se cierre en caso de error
+      // Asegurar que la página y el navegador se cierren en caso de error
       try {
         await page.close();
       } catch (closeError) {
         console.warn("[PDF] Error cerrando página:", closeError);
+      }
+      try {
+        await browser.close();
+      } catch (closeBrowserError) {
+        console.warn("[PDF] Error cerrando navegador:", closeBrowserError);
       }
       throw error;
     }

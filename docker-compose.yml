@@ -1,55 +1,66 @@
+version: '3.8'
+
 services:
-  backend:
+  mysql:
+    image: mysql:8.0
+    container_name: fusioncrmapiv3_mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-fusion_root_secure_2024!}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-fusioncrm_db}
+      MYSQL_USER: ${MYSQL_USER:-fusioncrm_user}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-fusion_user_secure_2024!}
+    volumes:
+      - ./db-data:/var/lib/mysql
+    networks:
+      - fusioncrmapiv3-internal
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+        reservations:
+          memory: 256M
+    command: '--default-authentication-plugin=mysql_native_password'
+
+  app:
     build:
-      context: .
+      context: ./repo
       dockerfile: Dockerfile
-    container_name: fusioncol-backend
-    ports:
-      - "3001:3001"
+    container_name: fusioncrmapiv3_app
+    restart: unless-stopped
+    depends_on:
+      - mysql
+    environment:
+      NODE_ENV: production
+      PORT: 3001
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_NAME: ${MYSQL_DATABASE:-fusioncrm_db}
+      DB_USER: ${MYSQL_USER:-fusioncrm_user}
+      DB_PASSWORD: ${MYSQL_PASSWORD:-fusion_user_secure_2024!}
     env_file:
       - .env
-    depends_on:
-      - mongo
-      - redis
-    restart: unless-stopped
-    shm_size: "2gb" # Aumentar memoria compartida para Chromium
-    cap_add:
-      - SYS_ADMIN # Necesario para sandbox de Chromium
     networks:
-      - fusioncol-network
-
-  # MongoDB (opcional - puedes usar MongoDB Atlas en producción)
-  mongo:
-    image: mongo:6.0
-    container_name: fusioncol-mongo
-    ports:
-      - "27017:27017"
-    environment:
-      - MONGO_INITDB_ROOT_USERNAME=admin
-      - MONGO_INITDB_ROOT_PASSWORD=password
-      - MONGO_INITDB_DATABASE=fusioncol
-    volumes:
-      - mongo_data:/data/db
-    restart: unless-stopped
-    networks:
-      - fusioncol-network
-
-  # Redis (opcional - puedes usar Redis Cloud en producción)
-  redis:
-    image: redis:7-alpine
-    container_name: fusioncol-redis
-    ports:
-      - "6379:6379"
-    volumes:
-      - redis_data:/data
-    restart: unless-stopped
-    networks:
-      - fusioncol-network
-
-volumes:
-  mongo_data:
-  redis_data:
+      - fusioncrmapiv3-internal
+      - traefik-public
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.fusioncrmapiv3.rule=Host(`fusion.alecap922.site`)"
+      - "traefik.http.routers.fusioncrmapiv3.entrypoints=websecure"
+      - "traefik.http.routers.fusioncrmapiv3.tls.certresolver=letsencrypt"
+      - "traefik.http.services.fusioncrmapiv3.loadbalancer.server.port=3001"
+    shm_size: '2gb'
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: '1.0'
+        reservations:
+          memory: 512M
+          cpus: '0.25'
 
 networks:
-  fusioncol-network:
+  fusioncrmapiv3-internal:
     driver: bridge
+  traefik-public:
+    external: true
